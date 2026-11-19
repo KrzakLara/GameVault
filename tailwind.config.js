@@ -1,4 +1,5 @@
 import defaultTheme from 'tailwindcss/defaultTheme';
+import animate from 'tailwindcss-animate';
 
 /** @type {import('tailwindcss').Config} */
 export default {
@@ -13,8 +14,11 @@ export default {
         extend: {
             fontFamily: {
                 sans: ['Instrument Sans', ...defaultTheme.fontFamily.sans],
+                display: ['Sora', 'Instrument Sans', ...defaultTheme.fontFamily.sans],
+                mono: ['JetBrains Mono', ...defaultTheme.fontFamily.mono],
             },
             borderRadius: {
+                xl: 'calc(var(--radius) + 4px)',
                 lg: 'var(--radius)',
                 md: 'calc(var(--radius) - 2px)',
                 sm: 'calc(var(--radius) - 4px)',
@@ -26,6 +30,7 @@ export default {
                     DEFAULT: 'hsl(var(--card))',
                     foreground: 'hsl(var(--card-foreground))',
                 },
+                raised: 'hsl(var(--surface-raised))',
                 popover: {
                     DEFAULT: 'hsl(var(--popover))',
                     foreground: 'hsl(var(--popover-foreground))',
@@ -33,6 +38,10 @@ export default {
                 primary: {
                     DEFAULT: 'hsl(var(--primary))',
                     foreground: 'hsl(var(--primary-foreground))',
+                },
+                highlight: {
+                    DEFAULT: 'hsl(var(--highlight))',
+                    foreground: 'hsl(var(--highlight-foreground))',
                 },
                 secondary: {
                     DEFAULT: 'hsl(var(--secondary))',
@@ -45,6 +54,14 @@ export default {
                 accent: {
                     DEFAULT: 'hsl(var(--accent))',
                     foreground: 'hsl(var(--accent-foreground))',
+                },
+                success: {
+                    DEFAULT: 'hsl(var(--success))',
+                    foreground: 'hsl(var(--success-foreground))',
+                },
+                warning: {
+                    DEFAULT: 'hsl(var(--warning))',
+                    foreground: 'hsl(var(--warning-foreground))',
                 },
                 destructive: {
                     DEFAULT: 'hsl(var(--destructive))',
@@ -71,7 +88,21 @@ export default {
                     ring: 'hsl(var(--sidebar-ring))',
                 },
             },
+            keyframes: {
+                shimmer: {
+                    '0%': { backgroundPosition: '-200% 0' },
+                    '100%': { backgroundPosition: '200% 0' },
+                },
+                'rise-in': {
+                    from: { opacity: '0', transform: 'translateY(6px)' },
+                    to: { opacity: '1', transform: 'translateY(0)' },
+                },
+            },
+            animation: {
+                shimmer: 'shimmer 1.6s linear infinite',
+                'rise-in': 'rise-in 220ms ease-out both',
+            },
         },
     },
-    plugins: [require('tailwindcss-animate')],
+    plugins: [animate],
 };

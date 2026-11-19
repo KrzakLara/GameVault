@@ -31,13 +31,17 @@ class OrderController extends Controller
     {
         $status = OrderStatus::tryFrom((string) $request->query('status'));
         $failure = FailureCode::tryFrom((string) $request->query('failure_code'));
-        $search = preg_replace('/[^0-9A-Za-z]/', '', (string) $request->query('q', ''));
+        // Searches order ids (ULID prefix) and customer e-mails (prefix). LIKE wildcards are escaped.
+        $search = mb_substr(trim((string) $request->query('q', '')), 0, 100);
+        $ulidPrefix = strtoupper((string) preg_replace('/[^0-9A-Za-z]/', '', $search));
 
         $orders = Order::query()
             ->with(['game:id,name,slug', 'user:id,name,email', 'key'])
             ->when($status, fn ($q) => $q->where('status', $status))
             ->when($failure, fn ($q) => $q->where('failure_code', $failure))
-            ->when($search !== '', fn ($q) => $q->where('public_id', 'like', strtoupper((string) $search).'%'))
+            ->when($search !== '', fn ($q) => $q->where(fn ($w) => $w
+                ->when($ulidPrefix !== '', fn ($w) => $w->where('public_id', 'like', $ulidPrefix.'%'))
+                ->orWhereHas('user', fn ($u) => $u->where('email', 'like', addcslashes($search, '%_\\').'%'))))
             ->latest('id')
             ->paginate(25)
             ->withQueryString();

@@ -24,6 +24,9 @@ function customerRoutes(): array
 function adminRoutes(): array
 {
     return [
+        'admin: overview' => ['GET', '/admin'],
+        'admin: inventory' => ['GET', '/admin/inventory'],
+        'admin: requeue all' => ['POST', '/admin/outbox/requeue'],
         'admin: order list' => ['GET', '/admin/orders'],
         'admin: order detail' => ['GET', '/admin/orders/{order}'],
         'admin: retry' => ['POST', '/admin/orders/{order}/retry'],

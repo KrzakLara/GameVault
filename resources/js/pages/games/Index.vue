@@ -1,48 +1,138 @@
 <script setup lang="ts">
-import { Link, router } from '@inertiajs/vue3';
-import { ref } from 'vue';
+import GameGrid from '@/components/games/GameGrid.vue';
+import EmptyState from '@/components/ui/gv/EmptyState.vue';
+import Pagination from '@/components/ui/gv/Pagination.vue';
+import StoreLayout from '@/layouts/StoreLayout.vue';
+import type { CatalogSort, Game, Paginated, Platform } from '@/types';
+import { Head, router } from '@inertiajs/vue3';
+import { useDebounceFn } from '@vueuse/core';
+import { SearchX, SlidersHorizontal, X } from 'lucide-vue-next';
+import { computed, reactive, ref } from 'vue';
 
-type Game = { slug: string; name: string; platform: string; genre: string; price_cents: number; currency: string; stock: number; cover_url: string | null; description: string | null };
-type Paginated<T> = { data: T[]; links: { prev: string | null; next: string | null } };
-const props = defineProps<{ games: Paginated<Game>; filters: { search: string; platform: string; genre: string }; platforms: string[]; genres: string[] }>();
-const search = ref(props.filters.search);
-const platform = ref(props.filters.platform);
-const genre = ref(props.filters.genre);
+const props = defineProps<{
+    games: Paginated<Game>;
+    filters: { search: string; platform: string; genre: string; sort: CatalogSort; in_stock: boolean };
+    platforms: Platform[];
+    genres: string[];
+    sorts: CatalogSort[];
+}>();
+
+const sortLabels: Record<CatalogSort, string> = {
+    featured: 'Featured first',
+    price_asc: 'Price: low to high',
+    price_desc: 'Price: high to low',
+    name: 'Name A–Z',
+    newest: 'Newest',
+};
+
+const form = reactive({ ...props.filters });
+const loading = ref(false);
+const activeFilters = computed(() => Boolean(form.search || form.platform || form.genre || form.in_stock || form.sort !== 'featured'));
+
+// The server filters, sorts and paginates; the URL stays shareable (query string).
 function apply() {
-    router.get('/games', { search: search.value, platform: platform.value, genre: genre.value }, { preserveState: true, replace: true });
+    // Only non-default values go into the URL, so links stay short and shareable.
+    const query: Record<string, string | number> = {};
+    if (form.search) query.search = form.search;
+    if (form.platform) query.platform = form.platform;
+    if (form.genre) query.genre = form.genre;
+    if (form.sort !== 'featured') query.sort = form.sort;
+    if (form.in_stock) query.in_stock = 1;
+
+    router.get(route('games.index'), query, {
+        only: ['games', 'filters'],
+        preserveState: true,
+        preserveScroll: true,
+        replace: true,
+        onStart: () => (loading.value = true),
+        onFinish: () => (loading.value = false),
+    });
 }
-const money = (cents: number, currency: string) => new Intl.NumberFormat('en-IE', { style: 'currency', currency }).format(cents / 100);
+const applySearch = useDebounceFn(apply, 350);
+
+function reset() {
+    Object.assign(form, { search: '', platform: '', genre: '', sort: 'featured', in_stock: false });
+    apply();
+}
+
+const selectClass =
+    'h-10 rounded-lg border border-input bg-card px-3 text-sm text-foreground focus:border-primary disabled:opacity-50 [&>option]:bg-card';
 </script>
+
 <template>
-    <main class="min-h-screen bg-[#090b18] text-white">
-        <header class="mx-auto flex max-w-7xl items-center justify-between px-6 py-7">
-            <Link href="/games" class="text-2xl font-black tracking-tight">GAME<span class="text-violet-400">VAULT</span><span class="ml-2 rounded bg-violet-500/15 px-2 py-1 text-[10px] uppercase tracking-widest text-violet-300">demo</span></Link>
-            <nav class="flex gap-5 text-sm text-slate-300"><Link href="/games" class="text-white">Explore</Link><Link href="/my-orders" class="hover:text-white">My orders</Link><Link v-if="!$page.props.auth.user" href="/login" class="hover:text-white">Sign in</Link></nav>
-        </header>
-        <section class="mx-auto max-w-7xl px-6 pb-12 pt-14">
-            <h1 class="max-w-3xl text-5xl font-extrabold leading-tight tracking-tight md:text-7xl">Epic games.<br /><span class="bg-gradient-to-r from-violet-400 to-cyan-300 bg-clip-text text-transparent">Instant access.</span></h1>
-            <div class="mt-10 flex max-w-4xl flex-col gap-3 sm:flex-row">
-                <input v-model="search" @keyup.enter="apply" aria-label="Search games" placeholder="Search for your next game..." class="min-w-0 flex-1 rounded-xl border border-white/10 bg-white/5 px-5 py-4 text-white outline-none placeholder:text-slate-500 focus:border-violet-400" />
-                <select v-model="platform" aria-label="Platform" class="rounded-xl border border-white/10 bg-[#17182c] px-5 py-4"><option value="">All platforms</option><option v-for="p in platforms" :key="p">{{ p }}</option></select>
-                <select v-model="genre" aria-label="Genre" class="rounded-xl border border-white/10 bg-[#17182c] px-5 py-4"><option value="">All genres</option><option v-for="g in genres" :key="g">{{ g }}</option></select>
-                <button @click="apply" class="rounded-xl bg-violet-500 px-8 py-4 font-bold transition hover:bg-violet-400">Explore →</button>
-            </div>
-            <div class="mt-7 grid gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-                <Link v-for="game in games.data" :key="game.slug" :href="`/games/${game.slug}`" class="group overflow-hidden rounded-2xl border border-white/10 bg-[#141728] transition hover:-translate-y-1 hover:border-violet-400/60">
-                    <div class="relative flex h-44 items-center justify-center overflow-hidden bg-gradient-to-br from-violet-800 to-cyan-800">
-                        <img v-if="game.cover_url" :src="game.cover_url" :alt="game.name" class="h-full w-full object-cover" />
-                        <span v-else aria-hidden="true" class="text-6xl font-black text-white/20">{{ game.name.split(' ').map((x) => x[0]).join('').slice(0, 3) }}</span>
-                        <span class="absolute left-4 top-4 rounded-lg bg-black/50 px-3 py-1 text-xs backdrop-blur">{{ game.platform }}</span>
-                    </div>
-                    <div class="p-5">
-                        <h3 class="min-h-12 text-lg font-bold group-hover:text-violet-300">{{ game.name }}</h3>
-                        <div class="mt-4 flex items-center justify-between"><strong class="text-xl">{{ money(game.price_cents, game.currency) }}</strong><span :class="game.stock ? 'text-emerald-400' : 'text-rose-400'" class="text-xs">{{ game.stock ? `${game.stock} in stock` : 'Sold out' }}</span></div>
-                    </div>
-                </Link>
-            </div>
-            <p v-if="!games.data.length" class="py-20 text-center text-slate-400">No games found. Try another search.</p>
-            <div class="mt-10 flex justify-center gap-4"><Link v-if="games.links.prev" :href="games.links.prev" class="rounded-lg border border-white/20 px-5 py-2">← Previous</Link><Link v-if="games.links.next" :href="games.links.next" class="rounded-lg border border-white/20 px-5 py-2">Next →</Link></div>
-        </section>
-        <footer class="border-t border-white/10 px-6 py-8 text-center text-xs text-slate-500">GAMEVAULT · Portfolio demonstration · Fictional games · Simulated payments only</footer>
-    </main>
+    <Head title="Catalogue" />
+    <StoreLayout>
+        <div class="mx-auto max-w-7xl px-4 py-10 sm:px-6 lg:px-8">
+            <header class="mb-8">
+                <h1 class="text-3xl font-bold sm:text-4xl">Catalogue</h1>
+                <p class="mt-2 text-muted-foreground">Every title is original and fictional, with live stock levels.</p>
+            </header>
+
+            <form
+                class="gv-surface mb-8 flex flex-col gap-3 p-4 lg:flex-row lg:items-center"
+                role="search"
+                aria-label="Filter games"
+                @submit.prevent="apply"
+            >
+                <div class="flex-1">
+                    <label for="catalog-search" class="sr-only">Search by name</label>
+                    <input
+                        id="catalog-search"
+                        v-model="form.search"
+                        type="search"
+                        maxlength="100"
+                        placeholder="Search by name…"
+                        class="h-10 w-full rounded-lg border border-input bg-background px-3 text-sm placeholder:text-muted-foreground focus:border-primary"
+                        data-testid="catalog-search"
+                        @input="applySearch"
+                    />
+                </div>
+                <div class="grid grid-cols-2 gap-3 sm:flex sm:items-center">
+                    <label class="sr-only" for="filter-platform">Platform</label>
+                    <select id="filter-platform" v-model="form.platform" :class="selectClass" data-testid="filter-platform" @change="apply">
+                        <option value="">All platforms</option>
+                        <option v-for="p in platforms" :key="p" :value="p">{{ p }}</option>
+                    </select>
+                    <label class="sr-only" for="filter-genre">Genre</label>
+                    <select id="filter-genre" v-model="form.genre" :class="selectClass" @change="apply">
+                        <option value="">All genres</option>
+                        <option v-for="g in genres" :key="g" :value="g">{{ g }}</option>
+                    </select>
+                    <label class="sr-only" for="filter-sort">Sort by</label>
+                    <select id="filter-sort" v-model="form.sort" :class="selectClass" data-testid="filter-sort" @change="apply">
+                        <option v-for="s in sorts" :key="s" :value="s">{{ sortLabels[s] }}</option>
+                    </select>
+                    <label class="flex h-10 cursor-pointer items-center gap-2 rounded-lg border border-input bg-card px-3 text-sm">
+                        <input v-model="form.in_stock" type="checkbox" class="size-4 accent-[hsl(262_84%_64%)]" @change="apply" />
+                        In stock
+                    </label>
+                </div>
+                <button
+                    v-if="activeFilters"
+                    type="button"
+                    class="inline-flex h-10 items-center justify-center gap-1.5 rounded-lg px-3 text-sm text-muted-foreground hover:bg-accent hover:text-foreground"
+                    @click="reset"
+                >
+                    <X class="size-4" aria-hidden="true" /> Reset
+                </button>
+            </form>
+
+            <p class="mb-4 flex items-center gap-2 text-sm text-muted-foreground" aria-live="polite">
+                <SlidersHorizontal class="size-4" aria-hidden="true" />
+                <span v-if="loading">Updating results…</span>
+                <span v-else data-testid="result-count"
+                    >{{ games.meta.total.toLocaleString('en') }} {{ games.meta.total === 1 ? 'game' : 'games' }}</span
+                >
+            </p>
+
+            <GameGrid v-if="loading || games.data.length" :games="games.data" :loading="loading" :skeletons="games.data.length || 8" />
+            <EmptyState v-else :icon="SearchX" title="No games match these filters" description="Try a different search term or reset the filters.">
+                <button type="button" class="rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground" @click="reset">
+                    Reset filters
+                </button>
+            </EmptyState>
+
+            <div class="mt-10"><Pagination :meta="games.meta" noun="games" /></div>
+        </div>
+    </StoreLayout>
 </template>

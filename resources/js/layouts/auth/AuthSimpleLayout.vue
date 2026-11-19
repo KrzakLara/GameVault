@@ -1,31 +1,28 @@
 <script setup lang="ts">
-import AppLogoIcon from '@/components/AppLogoIcon.vue';
+import GvLogo from '@/components/GvLogo.vue';
+import Toaster from '@/components/ui/gv/Toaster.vue';
 import { Link } from '@inertiajs/vue3';
 
-defineProps<{
-    title?: string;
-    description?: string;
-}>();
+defineProps<{ title?: string; description?: string }>();
 </script>
 
 <template>
-    <div class="flex min-h-svh flex-col items-center justify-center gap-6 bg-background p-6 md:p-10">
+    <div class="gv-aurora flex min-h-svh flex-col items-center justify-center px-4 py-10">
         <div class="w-full max-w-sm">
-            <div class="flex flex-col gap-8">
-                <div class="flex flex-col items-center gap-4">
-                    <Link :href="route('home')" class="flex flex-col items-center gap-2 font-medium">
-                        <div class="mb-1 flex h-9 w-9 items-center justify-center rounded-md">
-                            <AppLogoIcon class="size-9 fill-current text-[var(--foreground)] dark:text-white" />
-                        </div>
-                        <span class="sr-only">{{ title }}</span>
-                    </Link>
-                    <div class="space-y-2 text-center">
-                        <h1 class="text-xl font-medium">{{ title }}</h1>
-                        <p class="text-center text-sm text-muted-foreground">{{ description }}</p>
-                    </div>
+            <div class="mb-8 flex flex-col items-center gap-6 text-center">
+                <Link :href="route('home')" class="rounded-lg" aria-label="GameVault home">
+                    <GvLogo size="md" />
+                </Link>
+                <div class="space-y-2">
+                    <h1 class="font-display text-2xl font-semibold">{{ title }}</h1>
+                    <p class="text-sm text-muted-foreground">{{ description }}</p>
                 </div>
+            </div>
+            <div class="gv-surface p-6 shadow-2xl shadow-black/30">
                 <slot />
             </div>
+            <p class="mt-6 text-center text-xs text-muted-foreground">Portfolio demo · fictional games · simulated checkout</p>
         </div>
+        <Toaster />
     </div>
 </template>

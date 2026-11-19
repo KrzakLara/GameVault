@@ -41,7 +41,7 @@ it('returns 404 for an inactive game', function () {
     $this->get(route('games.show', $game))->assertNotFound();
 });
 
-it('shows a game with its stock count and no market lookup when the integration is disabled', function () {
+it('renders a game at once and defers the external market lookup to a follow-up request', function () {
     $game = Game::factory()->create(['cheapshark_id' => '123']);
     GameKey::factory()->count(2)->for($game)->create();
 
@@ -49,5 +49,8 @@ it('shows a game with its stock count and no market lookup when the integration 
         ->component('games/Show')
         ->where('game.slug', $game->slug)
         ->where('game.stock', 2)
-        ->where('marketPrice', null));
+        ->missing('marketPrice') // never blocks the first render
+        ->loadDeferredProps(fn (Assert $reload) => $reload
+            ->where('marketPrice.status', 'unavailable')
+            ->where('marketPrice.reason', 'disabled')));
 });

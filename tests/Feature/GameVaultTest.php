@@ -12,8 +12,6 @@ use App\Models\GameKey;
 use App\Models\InventoryMovement;
 use App\Models\Order;
 use App\Models\User;
-use App\Services\MarketPriceService;
-use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Str;
 
@@ -85,26 +83,4 @@ it('encrypts stored keys at rest', function () {
 
     expect($key->getRawOriginal('code'))->not->toContain('NEVER-PLAIN-TEXT')
         ->and($key->fresh()->code)->toBe('NEVER-PLAIN-TEXT');
-});
-
-it('caches external market prices', function () {
-    config(['gamevault.cheapshark.enabled' => true]);
-    Http::fake(['cheapshark.com/*' => Http::response(['deals' => [['price' => '12.99'], ['price' => '17.50']]], 200)]);
-    $game = Game::factory()->create(['cheapshark_id' => '1234']);
-    $service = app(MarketPriceService::class);
-
-    expect($service->forGame($game)['lowest_usd'])->toBe(12.99)
-        ->and($service->forGame($game)['lowest_usd'])->toBe(12.99);
-    Http::assertSentCount(1);
-});
-
-it('caches a market price outage briefly instead of calling the API on every view', function () {
-    config(['gamevault.cheapshark.enabled' => true]);
-    Http::fake(['cheapshark.com/*' => Http::response('down', 503)]);
-    $game = Game::factory()->create(['cheapshark_id' => '1234']);
-    $service = app(MarketPriceService::class);
-
-    expect($service->forGame($game))->toBeNull()
-        ->and($service->forGame($game))->toBeNull();
-    Http::assertSentCount(2); // 1 retry within the first lookup, then the cached failure
 });

@@ -14,6 +14,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Middleware\AddLinkHeadersForPreloadedAssets;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Context;
+use Inertia\Inertia;
 use Symfony\Component\HttpFoundation\Response;
 
 return Application::configure(basePath: dirname(__DIR__))
@@ -60,10 +61,24 @@ return Application::configure(basePath: dirname(__DIR__))
             ? $fail($request, 'temporarily_unavailable', 'The store is very busy right now. Please try again.', 503, ['Retry-After' => '1'])
             : null);
 
-        // Correlation id in every JSON error body, so a user-reported error can be found in logs.
-        $exceptions->respond(function (Response $response) {
-            if ($response instanceof JsonResponse && $response->getStatusCode() >= 400 && is_array($data = $response->getData(true))) {
-                $response->setData($data + ['request_id' => Context::get('request_id')]);
+        $exceptions->respond(function (Response $response, Throwable $e, Request $request) {
+            $status = $response->getStatusCode();
+
+            // Correlation id in every JSON error body, so a user-reported error can be found in logs.
+            if ($response instanceof JsonResponse) {
+                if ($status >= 400 && is_array($data = $response->getData(true))) {
+                    $response->setData($data + ['request_id' => Context::get('request_id')]);
+                }
+
+                return $response;
+            }
+
+            // Branded error page for browser requests. 500s keep the debug page while APP_DEBUG is on.
+            $branded = in_array($status, [403, 404, 419, 429, 503], true) || ($status === 500 && ! config('app.debug'));
+            if ($branded && ! $response->isRedirection()) {
+                return Inertia::render('Error', ['status' => $status, 'requestId' => Context::get('request_id')])
+                    ->toResponse($request)
+                    ->setStatusCode($status);
             }
 
             return $response;

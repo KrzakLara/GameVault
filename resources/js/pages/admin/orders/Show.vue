@@ -1,49 +1,170 @@
 <script setup lang="ts">
-import { Link, useForm } from '@inertiajs/vue3';
+import OrderStatusBadge from '@/components/orders/OrderStatusBadge.vue';
+import ConfirmDialog from '@/components/ui/gv/ConfirmDialog.vue';
+import { useAdminOrderActions } from '@/composables/useAdminOrderActions';
+import AdminLayout from '@/layouts/AdminLayout.vue';
+import { formatDateTime, formatMoney } from '@/lib/format';
+import type { AdminOrder, AdminTimelineEntry } from '@/types';
+import { Link } from '@inertiajs/vue3';
+import { Ban, ChevronLeft, RotateCcw } from 'lucide-vue-next';
+import { ref } from 'vue';
 
-type AdminOrder = {
-    public_id: string;
-    status: string;
-    failure_code: string | null;
-    retryable: boolean;
-    attempts: number;
-    lease_expires_at: string | null;
-    user: { name: string; email: string } | null;
-    game: { name: string };
-    key: { id: number; status: string; reserved_at: string | null; sold_at: string | null } | null;
-};
-type Entry = { type?: string; action?: string; from?: string | null; to?: string | null; actor: string | null; meta: Record<string, unknown> | null; at: string };
-const props = defineProps<{ order: AdminOrder; timeline: Entry[]; movements: { type: string; key_id: number; at: string }[]; audit: Entry[] }>();
+const props = defineProps<{
+    order: AdminOrder;
+    timeline: AdminTimelineEntry[];
+    movements: { type: string; key_id: number; at: string }[];
+    audit: { action: string; actor: string | null; meta: Record<string, unknown> | null; at: string }[];
+}>();
 
-const retryForm = useForm({ note: '' });
-const cancelForm = useForm({ reason: '' });
-const retry = () => retryForm.post(`/admin/orders/${props.order.public_id}/retry`, { preserveScroll: true });
-const cancel = () => {
-    if (confirm('Cancel this order permanently?')) cancelForm.post(`/admin/orders/${props.order.public_id}/cancel`, { preserveScroll: true });
-};
+const confirm = ref<'retry' | 'cancel' | null>(null);
+const actions = useAdminOrderActions();
+
+function run(reason: string) {
+    const done = () => (confirm.value = null);
+    if (confirm.value === 'retry') {
+        actions.retry(props.order, done);
+    } else if (confirm.value === 'cancel') {
+        actions.cancel(props.order, reason, done);
+    }
+}
+
+const metaText = (meta: Record<string, unknown> | null) =>
+    meta
+        ? Object.entries(meta)
+              .map(([k, v]) => `${k}: ${String(v)}`)
+              .join(' · ')
+        : '';
 </script>
+
 <template>
-    <main class="min-h-screen bg-[#090b18] px-6 py-8 text-white">
-        <div class="mx-auto max-w-5xl space-y-8">
-            <header class="flex items-center justify-between"><h1 class="font-mono text-2xl font-black">{{ order.public_id }}</h1><Link href="/admin/orders" class="text-sm text-violet-300">← Orders</Link></header>
-            <p v-if="$page.props.flash?.success" class="rounded-lg bg-emerald-500/15 p-3 text-sm text-emerald-200">{{ $page.props.flash.success }}</p>
-            <p v-if="$page.props.errors?.order" role="alert" class="rounded-lg bg-rose-500/15 p-3 text-sm text-rose-200">{{ $page.props.errors.order }}</p>
-            <section class="grid gap-2 text-sm sm:grid-cols-2">
-                <div>Status: <strong>{{ order.status }}</strong> <span v-if="order.failure_code">({{ order.failure_code }})</span></div>
-                <div>Attempts this cycle: {{ order.attempts }}</div>
-                <div>Customer: {{ order.user?.email ?? '(deleted user)' }}</div>
-                <div>Game: {{ order.game.name }}</div>
-                <div>Key: <span v-if="order.key">#{{ order.key.id }} · {{ order.key.status }}</span><span v-else>none</span></div>
-                <div>Lease expires: {{ order.lease_expires_at ?? '—' }}</div>
+    <AdminLayout :title="order.game?.name ?? 'Order'" :description="order.public_id">
+        <Link :href="route('admin.orders.index')" class="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground">
+            <ChevronLeft class="size-4" aria-hidden="true" /> All orders
+        </Link>
+
+        <div class="grid gap-6 xl:grid-cols-3">
+            <section class="gv-surface space-y-4 p-5" aria-labelledby="summary-heading">
+                <div class="flex items-center justify-between">
+                    <h2 id="summary-heading" class="font-semibold">Summary</h2>
+                    <OrderStatusBadge :status="order.status" />
+                </div>
+                <dl class="space-y-2 text-sm">
+                    <div class="flex justify-between gap-4">
+                        <dt class="text-muted-foreground">Customer</dt>
+                        <dd class="truncate">{{ order.user?.email ?? 'deleted account' }}</dd>
+                    </div>
+                    <div class="flex justify-between gap-4">
+                        <dt class="text-muted-foreground">Price</dt>
+                        <dd>{{ formatMoney(order.price_cents, order.currency) }}</dd>
+                    </div>
+                    <div v-if="order.failure_code" class="flex justify-between gap-4">
+                        <dt class="text-muted-foreground">Failure</dt>
+                        <dd>{{ order.failure_code }}</dd>
+                    </div>
+                    <div class="flex justify-between gap-4">
+                        <dt class="text-muted-foreground">Attempts this cycle</dt>
+                        <dd>{{ order.attempts }}</dd>
+                    </div>
+                    <div class="flex justify-between gap-4">
+                        <dt class="text-muted-foreground">Lease expires</dt>
+                        <dd>{{ formatDateTime(order.lease_expires_at) }}</dd>
+                    </div>
+                    <div class="flex justify-between gap-4">
+                        <dt class="text-muted-foreground">Key</dt>
+                        <dd>{{ order.key ? `#${order.key.id} · ${order.key.status}` : 'none' }}</dd>
+                    </div>
+                </dl>
+                <div v-if="order.status === 'failed'" class="flex flex-col gap-2 border-t border-border/70 pt-4">
+                    <button
+                        v-if="order.retryable"
+                        type="button"
+                        class="inline-flex items-center justify-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground"
+                        data-testid="retry-order"
+                        @click="
+                            actions.reset();
+                            confirm = 'retry';
+                        "
+                    >
+                        <RotateCcw class="size-4" aria-hidden="true" /> Retry fulfillment
+                    </button>
+                    <p v-else class="text-xs text-muted-foreground">This failure needs investigation and cannot be retried.</p>
+                    <button
+                        type="button"
+                        class="inline-flex items-center justify-center gap-2 rounded-lg border border-destructive/50 px-4 py-2 text-sm font-semibold text-[hsl(356_90%_76%)] hover:bg-destructive/10"
+                        @click="
+                            actions.reset();
+                            confirm = 'cancel';
+                        "
+                    >
+                        <Ban class="size-4" aria-hidden="true" /> Cancel order
+                    </button>
+                </div>
             </section>
-            <section v-if="order.status === 'failed'" class="flex flex-wrap gap-6">
-                <form v-if="order.retryable" @submit.prevent="retry" class="flex gap-2"><input v-model="retryForm.note" placeholder="Note (optional)" class="rounded-lg border border-white/10 bg-white/5 px-3 py-2" /><button :disabled="retryForm.processing" class="rounded-lg bg-violet-500 px-4 py-2 font-semibold">Retry</button></form>
-                <form @submit.prevent="cancel" class="flex gap-2"><input v-model="cancelForm.reason" required minlength="5" placeholder="Reason (required)" class="rounded-lg border border-white/10 bg-white/5 px-3 py-2" /><button :disabled="cancelForm.processing" class="rounded-lg bg-rose-600 px-4 py-2 font-semibold">Cancel order</button></form>
-                <p v-if="cancelForm.errors.reason" class="text-sm text-rose-300">{{ cancelForm.errors.reason }}</p>
+
+            <section class="gv-surface p-5 xl:col-span-2" aria-labelledby="timeline-heading">
+                <h2 id="timeline-heading" class="font-semibold">Fulfillment timeline</h2>
+                <ol class="mt-4 space-y-3 text-sm" data-testid="admin-timeline">
+                    <li v-for="(entry, i) in timeline" :key="i" class="flex gap-3">
+                        <span class="mt-1.5 size-2 shrink-0 rounded-full bg-primary" aria-hidden="true" />
+                        <div class="min-w-0">
+                            <p>
+                                <span class="font-medium">{{ entry.type.replaceAll('_', ' ') }}</span>
+                                <span v-if="entry.to" class="text-muted-foreground"> · {{ entry.from }} → {{ entry.to }}</span>
+                                <span v-if="entry.actor" class="text-muted-foreground"> · by {{ entry.actor }}</span>
+                            </p>
+                            <p class="text-xs text-muted-foreground">
+                                {{ formatDateTime(entry.at) }}<template v-if="entry.meta"> · {{ metaText(entry.meta) }}</template>
+                            </p>
+                        </div>
+                    </li>
+                </ol>
             </section>
-            <section><h2 class="mb-2 font-bold">Timeline</h2><ol class="space-y-1 text-sm text-slate-300"><li v-for="(e, i) in timeline" :key="i">{{ new Date(e.at).toLocaleString() }} · {{ e.type }} <span v-if="e.to">{{ e.from }} → {{ e.to }}</span> <span v-if="e.actor">by {{ e.actor }}</span> <code v-if="e.meta" class="text-xs text-slate-500">{{ JSON.stringify(e.meta) }}</code></li></ol></section>
-            <section><h2 class="mb-2 font-bold">Inventory movements</h2><ol class="space-y-1 text-sm text-slate-300"><li v-for="(m, i) in movements" :key="i">{{ new Date(m.at).toLocaleString() }} · {{ m.type }} · key #{{ m.key_id }}</li></ol></section>
-            <section><h2 class="mb-2 font-bold">Audit</h2><ol class="space-y-1 text-sm text-slate-300"><li v-for="(a, i) in audit" :key="i">{{ new Date(a.at).toLocaleString() }} · {{ a.action }} by {{ a.actor ?? 'system' }} <code v-if="a.meta" class="text-xs text-slate-500">{{ JSON.stringify(a.meta) }}</code></li></ol></section>
+
+            <section class="gv-surface p-5" aria-labelledby="movements-heading">
+                <h2 id="movements-heading" class="font-semibold">Inventory movements</h2>
+                <ul class="mt-4 space-y-2 text-sm">
+                    <li v-for="(m, i) in movements" :key="i" class="flex justify-between gap-2">
+                        <span>{{ m.type }} · key #{{ m.key_id }}</span
+                        ><span class="text-xs text-muted-foreground">{{ formatDateTime(m.at) }}</span>
+                    </li>
+                    <li v-if="!movements.length" class="text-muted-foreground">No movements.</li>
+                </ul>
+            </section>
+
+            <section class="gv-surface p-5 xl:col-span-2" aria-labelledby="audit-heading">
+                <h2 id="audit-heading" class="font-semibold">Audit trail</h2>
+                <ul class="mt-4 space-y-2 text-sm">
+                    <li v-for="(a, i) in audit" :key="i">
+                        <span class="font-medium">{{ a.action }}</span>
+                        <span class="text-muted-foreground">by {{ a.actor ?? 'system' }} · {{ formatDateTime(a.at) }}</span>
+                        <p v-if="a.meta" class="text-xs text-muted-foreground">{{ metaText(a.meta) }}</p>
+                    </li>
+                    <li v-if="!audit.length" class="text-muted-foreground">No privileged actions recorded for this order.</li>
+                </ul>
+            </section>
         </div>
-    </main>
+
+        <ConfirmDialog
+            :open="confirm === 'retry'"
+            title="Retry fulfillment?"
+            description="A key is reserved again (if in stock) and delivery is re-queued. The action is audited."
+            confirm-label="Retry"
+            :busy="actions.busy.value"
+            :error="actions.error.value"
+            @update:open="(v) => !v && (confirm = null)"
+            @confirm="run"
+        />
+        <ConfirmDialog
+            :open="confirm === 'cancel'"
+            title="Cancel this order permanently?"
+            description="The order can no longer be retried. A quarantined key stays off sale."
+            confirm-label="Cancel order"
+            destructive
+            reason-label="Reason for cancelling"
+            :busy="actions.busy.value"
+            :error="actions.error.value"
+            @update:open="(v) => !v && (confirm = null)"
+            @confirm="run"
+        />
+    </AdminLayout>
 </template>

@@ -1,43 +1,86 @@
 <script setup lang="ts">
-import { Link, router, usePage } from '@inertiajs/vue3';
-import { computed, ref } from 'vue';
+import PurchasePanel from '@/components/checkout/PurchasePanel.vue';
+import GameCard from '@/components/games/GameCard.vue';
+import GameCover from '@/components/games/GameCover.vue';
+import MarketPriceCard from '@/components/games/MarketPriceCard.vue';
+import PlatformBadge from '@/components/games/PlatformBadge.vue';
+import Badge from '@/components/ui/gv/Badge.vue';
+import { Skeleton } from '@/components/ui/skeleton';
+import StoreLayout from '@/layouts/StoreLayout.vue';
+import type { Game, MarketPrice } from '@/types';
+import { Deferred, Head, Link } from '@inertiajs/vue3';
+import { ChevronLeft } from 'lucide-vue-next';
 
-type Game = { slug: string; name: string; platform: string; price_cents: number; currency: string; stock: number; description: string | null };
-const props = defineProps<{ game: Game; marketPrice: { lowest_usd: number; source: string; currency: string } | null }>();
-const game = computed<Game>(() => props.game);
-const page = usePage<{ errors: Record<string, string> }>();
-const busy = ref(false);
-
-// One key per page view: a double click, a network retry or a resubmitted form is recognised by
-// the server as the SAME purchase and replayed, never charged twice.
-const idempotencyKey = crypto.randomUUID();
-
-function buy() {
-    if (busy.value || !game.value.stock) return;
-    busy.value = true;
-    router.post(`/games/${game.value.slug}/checkout`, { idempotency_key: idempotencyKey }, { onFinish: () => (busy.value = false) });
-}
-const price = computed(() => (game.value.price_cents / 100).toLocaleString('en-IE', { style: 'currency', currency: game.value.currency }));
+defineProps<{ game: Game; marketPrice?: MarketPrice; related: Game[]; lowStockThreshold: number }>();
 </script>
+
 <template>
-    <main class="min-h-screen bg-[#090b18] px-6 py-8 text-white">
-        <div class="mx-auto max-w-5xl">
-            <header class="mb-12 flex justify-between"><Link href="/games" class="text-xl font-black">GAME<span class="text-violet-400">VAULT</span></Link><Link href="/my-orders" class="text-slate-300">My orders →</Link></header>
-            <Link href="/games" class="text-sm text-violet-300">← Back to catalog</Link>
-            <div class="mt-10 grid overflow-hidden rounded-3xl border border-white/10 bg-[#141728] md:grid-cols-2">
-                <div class="flex min-h-96 items-center justify-center bg-gradient-to-br from-violet-800 via-indigo-700 to-cyan-800"><span class="text-8xl font-black text-white/20">GV</span></div>
-                <div class="p-9 md:p-12">
-                    <span class="rounded-lg bg-violet-500/20 px-3 py-1 text-xs text-violet-200">{{ game.platform }}</span>
-                    <h1 class="mt-6 text-4xl font-extrabold">{{ game.name }}</h1>
-                    <p class="mt-5 text-slate-400">{{ game.description }}</p>
-                    <div class="mt-12 text-4xl font-bold">{{ price }}</div>
-                    <p class="mt-2 text-sm" :class="game.stock ? 'text-emerald-400' : 'text-rose-400'">{{ game.stock ? `${game.stock} keys available` : 'Out of stock' }}</p>
-                    <p v-if="page.props.errors.checkout || page.props.errors.idempotency_key" role="alert" class="mt-4 rounded-lg bg-rose-500/15 p-3 text-sm text-rose-200">{{ page.props.errors.checkout || page.props.errors.idempotency_key }}</p>
-                    <button :disabled="!game.stock || busy" @click="buy" class="mt-8 w-full rounded-xl bg-violet-500 py-4 font-semibold hover:bg-violet-400 disabled:cursor-not-allowed disabled:opacity-50">{{ busy ? 'Processing...' : 'Buy now · Demo checkout' }}</button>
-                    <p class="mt-3 text-center text-xs text-slate-500">Simulated purchase. No real payment or real game keys.</p>
-                    <p v-if="marketPrice" class="mt-7 border-t border-white/10 pt-5 text-sm text-slate-400">Market reference: <strong class="text-white">${{ marketPrice.lowest_usd.toFixed(2) }} USD</strong> via {{ marketPrice.source }} (different currency, not directly comparable)</p>
+    <Head :title="game.name" />
+    <StoreLayout>
+        <div class="gv-aurora">
+            <div class="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
+                <Link :href="route('games.index')" class="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground">
+                    <ChevronLeft class="size-4" aria-hidden="true" /> Back to catalogue
+                </Link>
+
+                <div class="mt-6 grid gap-10 lg:grid-cols-[minmax(0,1fr)_380px]">
+                    <article class="grid gap-8 md:grid-cols-[260px_minmax(0,1fr)]">
+                        <div class="relative mx-auto w-56 overflow-hidden rounded-2xl border border-white/10 shadow-2xl shadow-black/50 md:w-full">
+                            <div class="aspect-[4/5]">
+                                <GameCover :slug="game.slug" :name="game.name" :platform="game.platform" :cover-url="game.cover_url" variant="hero" />
+                            </div>
+                        </div>
+                        <div class="min-w-0">
+                            <div class="flex flex-wrap items-center gap-2">
+                                <PlatformBadge :platform="game.platform" />
+                                <Badge>{{ game.genre }}</Badge>
+                                <Badge v-if="game.is_featured" tone="violet">Featured</Badge>
+                            </div>
+                            <h1 class="mt-4 text-3xl font-bold sm:text-4xl" data-testid="game-title">{{ game.name }}</h1>
+                            <p class="mt-4 max-w-prose leading-relaxed text-muted-foreground">
+                                {{ game.description ?? 'No description yet.' }}
+                            </p>
+                            <dl class="mt-6 grid max-w-md grid-cols-2 gap-4 text-sm">
+                                <div class="gv-surface p-3">
+                                    <dt class="text-muted-foreground">Platform</dt>
+                                    <dd class="mt-1 font-medium">{{ game.platform === 'Steam' ? 'Steam (PC)' : game.platform }}</dd>
+                                </div>
+                                <div class="gv-surface p-3">
+                                    <dt class="text-muted-foreground">Delivery</dt>
+                                    <dd class="mt-1 font-medium">Digital key, instant</dd>
+                                </div>
+                            </dl>
+                            <div class="mt-6 max-w-md">
+                                <Deferred data="marketPrice">
+                                    <template #fallback>
+                                        <div
+                                            class="space-y-2 rounded-xl border border-border/80 bg-raised/60 p-4"
+                                            aria-busy="true"
+                                            aria-label="Loading market price"
+                                        >
+                                            <Skeleton class="h-4 w-32" />
+                                            <Skeleton class="h-7 w-24" />
+                                            <Skeleton class="h-3 w-full" />
+                                        </div>
+                                    </template>
+                                    <MarketPriceCard v-if="marketPrice" :market="marketPrice" />
+                                </Deferred>
+                            </div>
+                        </div>
+                    </article>
+
+                    <aside class="lg:sticky lg:top-24 lg:self-start">
+                        <PurchasePanel :game="game" :low-stock-threshold="lowStockThreshold" />
+                    </aside>
                 </div>
             </div>
         </div>
-    </main>
+
+        <section v-if="related.length" class="mx-auto mt-16 max-w-7xl px-4 sm:px-6 lg:px-8" aria-labelledby="related-heading">
+            <h2 id="related-heading" class="mb-6 text-2xl font-semibold">You might also like</h2>
+            <div class="grid grid-cols-2 gap-4 sm:gap-5 md:grid-cols-4">
+                <GameCard v-for="g in related" :key="g.slug" :game="g" :low-stock-threshold="lowStockThreshold" />
+            </div>
+        </section>
+    </StoreLayout>
 </template>

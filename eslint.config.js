@@ -7,7 +7,18 @@ export default defineConfigWithVueTs(
     vue.configs['flat/essential'],
     vueTsConfigs.recommended,
     {
-        ignores: ['vendor', 'node_modules', 'public', 'bootstrap/ssr', 'tailwind.config.js', 'resources/js/components/ui/*'],
+        // Generated shadcn-vue primitives stay excluded; GameVault's own components (ui/gv) are linted.
+        ignores: [
+            'vendor',
+            'node_modules',
+            'public',
+            'bootstrap/ssr',
+            'tailwind.config.js',
+            'playwright-report',
+            'test-results',
+            'resources/js/components/ui/*',
+            '!resources/js/components/ui/gv',
+        ],
     },
     {
         rules: {
