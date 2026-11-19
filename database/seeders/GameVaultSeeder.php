@@ -3,32 +3,44 @@
 namespace Database\Seeders;
 
 use App\Models\Game;
-use App\Models\GameKey;
+use App\Services\Inventory\InventoryAllocator;
 use Illuminate\Database\Seeder;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 
+/**
+ * Fictional catalogue with synthetic keys. Idempotent: re-running only adds games that do not
+ * exist yet. Keys go through the allocator so they get fingerprints and "imported" movements.
+ */
 class GameVaultSeeder extends Seeder
 {
-    public function run(): void
+    public function run(InventoryAllocator $inventory): void
     {
         $titles = [
-            ['Starlight Odyssey','Steam',2999],['Neon Drift','Steam',1999],['Rune Keepers','Steam',3499],
-            ['Cyber Arena','PlayStation',3999],['Crystal Horizon','Xbox',2499],['Shadow Protocol','Steam',4599],
-            ['Solar Run','Xbox',1499],['Arcane Frontier','PlayStation',4499],['Velocity Zero','Steam',1299],
-            ['Nova Quest','Xbox',2799],['Echo Valley','Steam',1699],['Titan Forge','PlayStation',4999],
-            ['Nightfall City','Steam',2199],['Pixel Raiders','Xbox',999],['Dream Circuit','PlayStation',2999],
-            ['Stormbound Legends','Steam',3999],['Glitch Runner','Steam',1199],['Moonbase 7','Xbox',2299],
-            ['Hollow Citadel','PlayStation',3399],['Parallel Worlds','Steam',2699],
+            ['Starlight Odyssey', 'Steam', 'Adventure', 2999], ['Neon Drift', 'Steam', 'Racing', 1999], ['Rune Keepers', 'Steam', 'RPG', 3499],
+            ['Cyber Arena', 'PlayStation', 'Shooter', 3999], ['Crystal Horizon', 'Xbox', 'Adventure', 2499], ['Shadow Protocol', 'Steam', 'Action', 4599],
+            ['Solar Run', 'Xbox', 'Racing', 1499], ['Arcane Frontier', 'PlayStation', 'RPG', 4499], ['Velocity Zero', 'Steam', 'Racing', 1299],
+            ['Nova Quest', 'Xbox', 'RPG', 2799], ['Echo Valley', 'Steam', 'Indie', 1699], ['Titan Forge', 'PlayStation', 'Strategy', 4999],
+            ['Nightfall City', 'Steam', 'Action', 2199], ['Pixel Raiders', 'Xbox', 'Indie', 999], ['Dream Circuit', 'PlayStation', 'Indie', 2999],
+            ['Stormbound Legends', 'Steam', 'Strategy', 3999], ['Glitch Runner', 'Steam', 'Action', 1199], ['Moonbase 7', 'Xbox', 'Strategy', 2299],
+            ['Hollow Citadel', 'PlayStation', 'Adventure', 3399], ['Parallel Worlds', 'Steam', 'Adventure', 2699],
         ];
-        foreach ($titles as [$name,$platform,$price]) {
-            $game = Game::firstOrCreate(['slug'=>Str::slug($name)], [
-                'name'=>$name,'platform'=>$platform,'price_cents'=>$price,
-                'description'=>'Discover '.$name.', an original fictional game in our demo catalogue.',
+
+        foreach ($titles as $i => [$name, $platform, $genre, $price]) {
+            $game = Game::firstOrCreate(['slug' => Str::slug($name)], [
+                'name' => $name, 'platform' => $platform, 'genre' => $genre, 'price_cents' => $price, 'currency' => 'EUR',
+                'is_featured' => $i < 4,
+                'description' => 'Discover '.$name.', an original fictional game in our demo catalogue.',
             ]);
-            if ($game->keys()->exists()) continue;
-            for ($i=0; $i<5; $i++) {
-                GameKey::create(['game_id'=>$game->id,'code'=>implode('-', [Str::upper(Str::random(5)),Str::upper(Str::random(5)),Str::upper(Str::random(5))]),'status'=>'available']);
+
+            if ($game->keys()->exists()) {
+                continue;
             }
+
+            // Synthetic, clearly non-commercial codes. A couple of titles start with one key so
+            // the "last key" race is easy to try by hand.
+            $codes = array_map(fn () => 'DEMO-'.Str::upper(Str::random(5)).'-'.Str::upper(Str::random(5)), range(1, $i % 7 === 0 ? 1 : 5));
+            DB::transaction(fn () => $inventory->import($game, $codes));
         }
     }
 }

@@ -1,4 +1,47 @@
+# Local development stack. Credentials below are local-only placeholders, never production values.
+x-app: &app
+  build:
+    context: .
+    dockerfile: docker/php/Dockerfile
+  image: gamevault-app:dev
+  working_dir: /app
+  volumes:
+    - .:/app
+  env_file: .env
+  environment:
+    DB_HOST: mysql
+    DB_PORT: 3306
+    REDIS_HOST: redis
+    REDIS_PORT: 6379
+  depends_on:
+    mysql:
+      condition: service_healthy
+    redis:
+      condition: service_healthy
+
 services:
+  app:
+    <<: *app
+    command: php artisan serve --host=0.0.0.0 --port=8000
+    environment:
+      DB_HOST: mysql
+      DB_PORT: 3306
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      PHP_CLI_SERVER_WORKERS: 8
+    ports:
+      - '127.0.0.1:8000:8000'
+
+  horizon:
+    <<: *app
+    command: php artisan horizon
+    profiles: [workers]
+
+  scheduler:
+    <<: *app
+    command: php artisan schedule:work
+    profiles: [workers]
+
   mysql:
     image: mysql:8.4
     restart: unless-stopped
@@ -11,10 +54,23 @@ services:
       - '127.0.0.1:3307:3306'
     volumes:
       - gamevault_mysql:/var/lib/mysql
+      - ./docker/mysql/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
     healthcheck:
       test: ['CMD-SHELL', 'mysqladmin ping -h 127.0.0.1 -uroot -p"$$MYSQL_ROOT_PASSWORD"']
       interval: 5s
       timeout: 5s
-      retries: 15
+      retries: 20
+
+  redis:
+    image: redis:7.4-alpine
+    restart: unless-stopped
+    ports:
+      - '127.0.0.1:6380:6379'
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
 volumes:
   gamevault_mysql:

@@ -1,88 +1,58 @@
 # GAMEVAULT 🎮
 
-**Game-key marketplace showcase** · PHP / Laravel 13 · Vue 3 · Inertia · MySQL · Tailwind CSS
+**Game-key marketplace showcase** · PHP 8.4 / Laravel 12 · Vue 3 · Inertia · MySQL 8.4 · Redis + Horizon
 
-> Fictional games, simulated payments and synthetic keys. Not affiliated with GameBoost. The code is a portfolio demo, not a production payment processor.
+> Fictional games, simulated payments and synthetic keys. Not affiliated with any real store. The code is a portfolio demo, not a production payment processor.
 
 ## Why this project exists
 
-Game marketplaces have a deceptively difficult backend problem: when two buyers request the last inventory item, neither should receive the same key. GameVault models the full path from checkout to queued, transaction-safe fulfillment.
+Game marketplaces have a deceptively difficult backend problem: when twenty buyers request the last key at the same moment, exactly one may get it, nobody may be told "sold out" while it could still be theirs, and queue jobs that run twice or crash half-way must never deliver a key twice or lose one. GameVault models the full path from checkout to queued, transaction-safe fulfillment and verifies it with real multi-process tests on MySQL.
 
-### Features
-- Searchable, responsive gaming catalogue with Steam / PlayStation / Xbox filters
-- Authentication via official Laravel Vue starter kit
-- Demo checkout and order statuses (`pending`, `delivered`, `failed`)
-- Queued order delivery, InnoDB row locking and idempotent worker
-- Encrypted keys at rest, owner-only reveal endpoint, no secret in notification email
-- CheapShark price reference (cached 30 min; USD is clearly labeled)
-- Pest tests, MySQL CI and Vue production build
+### Backend features
+- Idempotent checkout (per user + idempotency key, enforced by a unique index), server-side price snapshot, synchronous stock reservation
+- Concurrency-safe inventory: `FOR UPDATE SKIP LOCKED` with a verified-stockout fallback (no false "sold out")
+- Fulfillment with leases and fencing tokens: duplicate jobs are no-ops, crashed workers are taken over, stale workers cannot finalize
+- Transactional outbox with SKIP LOCKED leases, fencing, exponential backoff and dead letters
+- 17 MySQL CHECK constraints plus composite foreign keys for inventory ownership
+- Owner-only, rate-limited, audited key reveal (POST); encrypted keys at rest; no key in e-mails
+- Admin area (orders, retry/cancel, key import, outbox) behind a server-side gate; audit log
+- Request-ID correlation across HTTP, logs, queued jobs and audit entries
 
-## Setup (on a developer machine with network access)
+See **[docs/architecture.md](docs/architecture.md)** for the guarantees, how each is enforced, and the failure matrix.
 
-The source package is an **overlay** for the official Laravel Vue starter (not a standalone framework distribution). To make a complete repo:
+## Running locally (Docker)
 
 ```bash
-composer create-project laravel/vue-starter-kit gamevault
-cd gamevault
-# Copy all files from this overlay into the gamevault directory, preserving folders.
-# Then append the following line to routes/web.php (only once):
-# require __DIR__.'/gamevault.php';
-composer install
-npm install
 cp .env.example .env
-php artisan key:generate
+docker compose up -d mysql redis
+docker compose run --rm app composer install
+docker compose run --rm app php artisan key:generate
+docker compose run --rm app php artisan migrate
+docker compose run --rm app php artisan db:seed --class=GameVaultSeeder
+docker compose run --rm app npm ci
+docker compose run --rm app npm run build
+docker compose up -d app                       # http://localhost:8000/games
+docker compose --profile workers up -d         # Horizon + scheduler (fulfillment, outbox, recovery)
+docker compose run --rm app php artisan gamevault:admin you@example.com   # admin rights (CLI only)
 ```
 
-Set up a local MySQL database and configure `.env`:
-
-```dotenv
-DB_CONNECTION=mysql
-DB_HOST=127.0.0.1
-DB_PORT=3306
-DB_DATABASE=gamevault
-DB_USERNAME=gamevault
-DB_PASSWORD=your_local_password
-QUEUE_CONNECTION=database
-MAIL_MAILER=log
-```
+## Tests and quality checks
 
 ```bash
-php artisan migrate
-php artisan db:seed --class=GameVaultSeeder
-php artisan serve
-npm run dev
-# Another terminal:
-php artisan queue:work --tries=3
+docker compose run --rm app php artisan test                          # everything (Unit, Feature, Integration)
+docker compose run --rm app php artisan test --testsuite=Integration  # MySQL locking, multi-process concurrency, migrations
+docker compose run --rm app vendor/bin/pint --test
+docker compose run --rm app vendor/bin/phpstan analyse --memory-limit=1G
 ```
 
-Visit `http://localhost:8000/games`. Register and buy a fictional game to test delivery. Refresh My Orders or enable polling for updates.
+The suite runs on MySQL 8.4 only, against the dedicated `gamevault_test` database. `phpunit.xml` forces that database even inside the app container (whose environment comes from `.env`), and `Tests\TestCase` refuses to run against any database whose name lacks `_test`, so tests can never wipe development data.
 
-## Tests
+Concurrency tests use independent PHP processes, each with its own MySQL connection, released simultaneously by a barrier (see docs/architecture.md, "Verification").
 
-```bash
-php artisan test --filter=GameVault
-npm run build
-```
+## Honest limitations
 
-**Status:** Source generated, **not executed in this environment** (Composer/dependency downloads unavailable). The supplied tests cover sequential non-duplication and idempotence, **not true simultaneous concurrency**. Add a 2-process MySQL concurrency integration scenario before using the word “proven”.
+Simulated payment and supplier; at-least-once delivery for the notification e-mail; APP_KEY rotation needs a re-encryption step; the frontend pages are functional but minimal (the UI is the next phase).
 
 ## AI-assisted engineering
 
-AI helped scaffold models, frontend pages and tests. Engineering review focus: order ownership checks, correct transaction boundaries, after-commit event timing, secret handling, deadlock retries and realistic concurrency claims. All AI-produced code must be run, reviewed and corrected before publication as production-ready. This statement describes the generated scaffold, not an assertion that a finished repo was reviewed and verified.
-
-See [architecture](docs/architecture.md) for the fulfillment diagram and tradeoffs.
-
-## Next hardening steps
-
-Concurrent fulfillment integration test using multiple MySQL connections/processes, transactional outbox for guaranteed notification dispatch, stock-aware checkout semantics, request idempotency keys, observability, image assets and browser E2E tests.
-
-### Optional local MySQL via Docker
-
-`docker compose up -d` starts MySQL 8.4 on `127.0.0.1:3307`. Set `.env` DB host `127.0.0.1`, port `3307`, database/user `gamevault`, password `gamevault_local_dev`. These values are for local development only.
-
-### Screenshots to add after verifying the running app
-
-1. Catalogue with filters and item cards
-2. Game details and demo checkout
-3. Delivered order before/after reveal
-4. GitHub Actions green pipeline
+AI helped scaffold and harden this code. Every claim in this README and in docs/architecture.md is backed by a test that was executed against MySQL 8.4 in Docker; concurrency claims come from multi-process tests, not sequential ones.

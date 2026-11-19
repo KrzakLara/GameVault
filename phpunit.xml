@@ -11,23 +11,47 @@
         <testsuite name="Feature">
             <directory>tests/Feature</directory>
         </testsuite>
+        <!-- Real MySQL behaviour: constraints, row locking, multi-process concurrency, migrations. -->
+        <testsuite name="Integration">
+            <directory>tests/Integration</directory>
+        </testsuite>
     </testsuites>
     <source>
         <include>
             <directory>app</directory>
         </include>
     </source>
+    <!--
+        Docker Compose injects .env into the container environment (APP_ENV=local,
+        DB_DATABASE=gamevault). PHPUnit's <env> does not override existing variables, and
+        Laravel reads $_SERVER before $_ENV, so the values that keep tests away from real data
+        are forced into BOTH superglobals. Tests\TestCase additionally refuses to run against
+        any database whose name does not contain "_test".
+    -->
     <php>
-        <env name="APP_ENV" value="testing"/>
+        <server name="APP_ENV" value="testing" force="true"/>
+        <server name="DB_CONNECTION" value="mysql" force="true"/>
+        <server name="DB_DATABASE" value="gamevault_test" force="true"/>
+        <server name="CACHE_STORE" value="array" force="true"/>
+        <server name="SESSION_DRIVER" value="array" force="true"/>
+        <server name="QUEUE_CONNECTION" value="sync" force="true"/>
+        <server name="MAIL_MAILER" value="array" force="true"/>
+        <server name="BCRYPT_ROUNDS" value="4" force="true"/>
+        <server name="GAMEVAULT_FULFILLMENT_LATENCY_MS" value="0" force="true"/>
+        <server name="CHEAPSHARK_ENABLED" value="false" force="true"/>
+
+        <env name="APP_ENV" value="testing" force="true"/>
         <env name="APP_MAINTENANCE_DRIVER" value="file"/>
-        <env name="BCRYPT_ROUNDS" value="4"/>
-        <env name="CACHE_STORE" value="array"/>
-        <env name="DB_CONNECTION" value="sqlite"/>
-        <env name="DB_DATABASE" value=":memory:"/>
-        <env name="MAIL_MAILER" value="array"/>
+        <env name="BCRYPT_ROUNDS" value="4" force="true"/>
+        <env name="CACHE_STORE" value="array" force="true"/>
+        <env name="DB_CONNECTION" value="mysql" force="true"/>
+        <env name="DB_DATABASE" value="gamevault_test" force="true"/>
+        <env name="MAIL_MAILER" value="array" force="true"/>
         <env name="PULSE_ENABLED" value="false"/>
-        <env name="QUEUE_CONNECTION" value="sync"/>
-        <env name="SESSION_DRIVER" value="array"/>
+        <env name="QUEUE_CONNECTION" value="sync" force="true"/>
+        <env name="SESSION_DRIVER" value="array" force="true"/>
         <env name="TELESCOPE_ENABLED" value="false"/>
+        <env name="GAMEVAULT_FULFILLMENT_LATENCY_MS" value="0" force="true"/>
+        <env name="CHEAPSHARK_ENABLED" value="false" force="true"/>
     </php>
 </phpunit>

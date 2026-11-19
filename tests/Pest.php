@@ -1,5 +1,8 @@
 <?php
 
+use Illuminate\Foundation\Testing\RefreshDatabase;
+use Tests\TestCase;
+
 /*
 |--------------------------------------------------------------------------
 | Test Case
@@ -11,9 +14,14 @@
 |
 */
 
-pest()->extend(Tests\TestCase::class)
-    ->use(Illuminate\Foundation\Testing\RefreshDatabase::class)
+pest()->extend(TestCase::class)
+    ->use(RefreshDatabase::class)
     ->in('Feature');
+
+// Integration tests choose their own database strategy per file: RefreshDatabase for
+// single-connection MySQL behaviour, InteractsWithCommittedData for multi-process tests.
+pest()->extend(TestCase::class)
+    ->in('Integration');
 
 /*
 |--------------------------------------------------------------------------

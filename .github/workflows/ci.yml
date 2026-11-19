@@ -2,6 +2,10 @@ name: Quality Gate
 on:
   push:
   pull_request:
+
+# Single gate for the backend: style, static analysis, and the full test suite on real MySQL 8.4,
+# including the multi-process concurrency tests (they spawn independent PHP processes, each with
+# its own MySQL connection). The suite refuses to run without MySQL by design.
 jobs:
   tests:
     runs-on: ubuntu-latest
@@ -16,30 +20,29 @@ jobs:
           --health-cmd="mysqladmin ping -h 127.0.0.1 -uroot -proot"
           --health-interval=10s --health-timeout=5s --health-retries=12
     env:
-      APP_ENV: testing
       DB_CONNECTION: mysql
       DB_HOST: 127.0.0.1
       DB_PORT: 3306
       DB_DATABASE: gamevault_test
       DB_USERNAME: root
       DB_PASSWORD: root
-      CACHE_STORE: array
-      SESSION_DRIVER: array
-      QUEUE_CONNECTION: sync
-      MAIL_MAILER: log
     steps:
       - uses: actions/checkout@v4
       - uses: shivammathur/setup-php@v2
         with:
           php-version: '8.4'
-          extensions: mbstring, dom, fileinfo, pdo_mysql
+          # pcntl/posix: the concurrency tests SIGKILL worker processes on purpose.
+          extensions: mbstring, dom, fileinfo, pdo_mysql, pcntl, posix, intl, bcmath
           coverage: none
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
           cache: npm
+      - run: composer validate --strict
       - run: composer install --no-interaction --prefer-dist --no-progress
       - run: cp .env.example .env && php artisan key:generate
-      - run: php artisan migrate --force
-      - run: php artisan test
+      - run: vendor/bin/pint --test
+      - run: vendor/bin/phpstan analyse --memory-limit=1G --no-progress
+      # The Vite manifest must exist before tests render full pages.
       - run: npm ci && npm run build
+      - run: php artisan test

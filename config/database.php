@@ -1,6 +1,7 @@
 <?php
 
 use Illuminate\Support\Str;
+use Pdo\Mysql;
 
 return [
 
@@ -57,8 +58,20 @@ return [
             'prefix_indexes' => true,
             'strict' => true,
             'engine' => null,
+            /*
+             * READ COMMITTED: locking reads take record locks only, no gap/next-key locks. The
+             * inventory allocator (FOR UPDATE SKIP LOCKED) and outbox claimer rely on that to stay
+             * deadlock-free under contention; under REPEATABLE READ the multi-process tests showed
+             * gap-lock deadlocks between concurrent checkouts. No code path relies on snapshot
+             * reads for a decision: every decision is taken under an explicit row lock. See
+             * docs/architecture.md ("Isolation level").
+             */
+            'isolation_level' => env('DB_ISOLATION_LEVEL', 'READ COMMITTED'),
             'options' => extension_loaded('pdo_mysql') ? array_filter([
-                PDO::MYSQL_ATTR_SSL_CA => env('MYSQL_ATTR_SSL_CA'),
+                (PHP_VERSION_ID >= 80500 ? Mysql::ATTR_SSL_CA : PDO::MYSQL_ATTR_SSL_CA) => env('MYSQL_ATTR_SSL_CA'),
+                // Fail fast instead of InnoDB's 50 s default: a request that waits this long on a
+                // row lock is better retried (idempotently) than left hanging.
+                (PHP_VERSION_ID >= 80500 ? Mysql::ATTR_INIT_COMMAND : PDO::MYSQL_ATTR_INIT_COMMAND) => 'SET SESSION innodb_lock_wait_timeout = '.max(1, (int) env('DB_LOCK_WAIT_TIMEOUT', 5)),
             ]) : [],
         ],
 

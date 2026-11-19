@@ -1,67 +1,110 @@
 <?php
 
+// The original overlay scenarios, updated to the hardened APIs. Each keeps its original intent.
+
+use App\Enums\FailureCode;
+use App\Enums\InventoryMovementType;
+use App\Enums\KeyStatus;
+use App\Enums\OrderStatus;
 use App\Jobs\DeliverGameKey;
 use App\Models\Game;
 use App\Models\GameKey;
+use App\Models\InventoryMovement;
 use App\Models\Order;
 use App\Models\User;
 use App\Services\MarketPriceService;
-use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Queue;
+use Illuminate\Support\Str;
 
-uses(RefreshDatabase::class);
+function runDelivery(int $orderId): void
+{
+    app()->call([new DeliverGameKey($orderId), 'handle']);
+}
 
 it('creates a pending order and queues delivery', function () {
     Queue::fake();
-    $user=User::factory()->create();$game=Game::factory()->create();
-    $this->actingAs($user)->post(route('orders.store',$game))->assertRedirect(route('orders.index'));
-    $order=Order::sole();expect($order->status)->toBe('pending');
-    Queue::assertPushed(DeliverGameKey::class, fn ($job) => $job->orderId===$order->id);
+    $user = User::factory()->create();
+    $game = Game::factory()->create();
+    GameKey::factory()->for($game)->create();
+
+    $this->actingAs($user)->post(route('orders.store', $game), ['idempotency_key' => (string) Str::uuid()])
+        ->assertRedirect(route('orders.show', Order::sole()));
+
+    $order = Order::sole();
+    expect($order->status)->toBe(OrderStatus::Pending);
+    Queue::assertPushed(DeliverGameKey::class, fn (DeliverGameKey $job) => $job->orderId === $order->id);
 });
 
 it('delivers an available key and remains idempotent on retry', function () {
-    $order=Order::factory()->create();$key=GameKey::factory()->create(['game_id'=>$order->game_id]);
-    $job=new DeliverGameKey($order->id);$job->handle();$job->handle();
-    expect($order->fresh()->status)->toBe('delivered');
-    expect($key->fresh()->order_id)->toBe($order->id);
+    $order = Order::factory()->withReservedKey()->create();
+
+    runDelivery($order->id);
+    runDelivery($order->id);
+
+    expect($order->fresh()->status)->toBe(OrderStatus::Delivered)
+        ->and($order->key->fresh()->status)->toBe(KeyStatus::Sold)
+        ->and(InventoryMovement::where('type', InventoryMovementType::Sold)->count())->toBe(1);
 });
 
 it('fails gracefully when inventory is empty', function () {
-    $order=Order::factory()->create();
-    (new DeliverGameKey($order->id))->handle();
-    expect($order->fresh()->status)->toBe('failed');
+    $order = Order::factory()->create(); // legacy order: no reservation, no stock
+
+    runDelivery($order->id);
+
+    expect($order->fresh()->status)->toBe(OrderStatus::Failed)
+        ->and($order->fresh()->failure_code)->toBe(FailureCode::OutOfStock);
 });
 
 it('never assigns the same key to two sequential orders', function () {
-    $game=Game::factory()->create();$key=GameKey::factory()->create(['game_id'=>$game->id]);
-    $first=Order::factory()->create(['game_id'=>$game->id]);
-    $second=Order::factory()->create(['game_id'=>$game->id]);
-    (new DeliverGameKey($first->id))->handle();(new DeliverGameKey($second->id))->handle();
-    expect($first->fresh()->status)->toBe('delivered');
-    expect($second->fresh()->status)->toBe('failed');
-    expect($key->fresh()->order_id)->toBe($first->id);
+    $game = Game::factory()->create();
+    $key = GameKey::factory()->for($game)->create();
+    $first = Order::factory()->for($game)->create();
+    $second = Order::factory()->for($game)->create();
+
+    runDelivery($first->id);
+    runDelivery($second->id);
+
+    expect($first->fresh()->status)->toBe(OrderStatus::Delivered)
+        ->and($second->fresh()->status)->toBe(OrderStatus::Failed)
+        ->and($key->fresh()->order_id)->toBe($first->id);
 });
 
 it('forbids revealing another users key', function () {
-    $owner=User::factory()->create();$stranger=User::factory()->create();
-    $order=Order::factory()->create(['user_id'=>$owner->id,'status'=>'delivered']);
-    GameKey::factory()->create(['game_id'=>$order->game_id,'status'=>'sold','order_id'=>$order->id,'code'=>'SECRET-KEY']);
-    $this->actingAs($stranger)->get(route('orders.reveal',$order))->assertForbidden();
-    $this->actingAs($owner)->get(route('orders.reveal',$order))->assertOk()->assertJsonPath('code','SECRET-KEY');
+    $owner = User::factory()->create();
+    $stranger = User::factory()->create();
+    $order = Order::factory()->for($owner)->delivered('SECRET-KEY')->create();
+
+    // 404, not 403: a stranger cannot even confirm that the order exists.
+    $this->actingAs($stranger)->postJson(route('orders.reveal', $order))->assertNotFound();
+    $this->actingAs($owner)->postJson(route('orders.reveal', $order))->assertOk()->assertJsonPath('key', 'SECRET-KEY');
 });
 
 it('encrypts stored keys at rest', function () {
-    $key=GameKey::factory()->create(['code'=>'NEVER-PLAIN-TEXT']);
-    expect($key->getRawOriginal('code'))->not->toContain('NEVER-PLAIN-TEXT');
-    expect($key->fresh()->code)->toBe('NEVER-PLAIN-TEXT');
+    $key = GameKey::factory()->create(['code' => 'NEVER-PLAIN-TEXT']);
+
+    expect($key->getRawOriginal('code'))->not->toContain('NEVER-PLAIN-TEXT')
+        ->and($key->fresh()->code)->toBe('NEVER-PLAIN-TEXT');
 });
 
 it('caches external market prices', function () {
-    Http::fake(['cheapshark.com/*'=>Http::response(['deals'=>[['price'=>'12.99'],['price'=>'17.50']]],200)]);
-    $game=Game::factory()->create(['cheapshark_id'=>'1234']);
-    $service=app(MarketPriceService::class);
-    expect($service->forGame($game)['lowest_usd'])->toBe(12.99);
-    expect($service->forGame($game)['lowest_usd'])->toBe(12.99);
+    config(['gamevault.cheapshark.enabled' => true]);
+    Http::fake(['cheapshark.com/*' => Http::response(['deals' => [['price' => '12.99'], ['price' => '17.50']]], 200)]);
+    $game = Game::factory()->create(['cheapshark_id' => '1234']);
+    $service = app(MarketPriceService::class);
+
+    expect($service->forGame($game)['lowest_usd'])->toBe(12.99)
+        ->and($service->forGame($game)['lowest_usd'])->toBe(12.99);
     Http::assertSentCount(1);
+});
+
+it('caches a market price outage briefly instead of calling the API on every view', function () {
+    config(['gamevault.cheapshark.enabled' => true]);
+    Http::fake(['cheapshark.com/*' => Http::response('down', 503)]);
+    $game = Game::factory()->create(['cheapshark_id' => '1234']);
+    $service = app(MarketPriceService::class);
+
+    expect($service->forGame($game))->toBeNull()
+        ->and($service->forGame($game))->toBeNull();
+    Http::assertSentCount(2); // 1 retry within the first lookup, then the cached failure
 });

@@ -14,14 +14,17 @@ class VerifyEmailController extends Controller
      */
     public function __invoke(EmailVerificationRequest $request): RedirectResponse
     {
-        if ($request->user()->hasVerifiedEmail()) {
+        if ($this->currentUser($request)->hasVerifiedEmail()) {
             return redirect()->intended(route('dashboard', absolute: false).'?verified=1');
         }
 
-        if ($request->user()->markEmailAsVerified()) {
-            /** @var \Illuminate\Contracts\Auth\MustVerifyEmail $user */
-            $user = $request->user();
-            event(new Verified($user));
+        if ($this->currentUser($request)->markEmailAsVerified()) {
+            // Foundation\Auth\User uses the MustVerifyEmail *trait* but not the interface the event's
+            // docblock names; the constructor itself is untyped, so this is safe at runtime.
+            // Implementing the interface would switch on mandatory e-mail verification (a product
+            // decision, deliberately not taken here).
+            // @phpstan-ignore argument.type
+            event(new Verified($this->currentUser($request)));
         }
 
         return redirect()->intended(route('dashboard', absolute: false).'?verified=1');
