@@ -41,6 +41,16 @@ it('uses a bounded exponential retry schedule for fulfillment jobs', function ()
     }
 });
 
+it('keeps the recovery threshold longer than any gap between fulfillment retries', function () {
+    // After a transient error the order waits, lease relinquished, for its queue retry: at most the
+    // longest backoff plus the time a busy worker needs to pick the job up. Recovering it sooner
+    // would start a second retry chain next to the scheduled one.
+    $job = new DeliverGameKey(1);
+    $longestRetryGap = max($job->backoff()) + $job->timeout;
+
+    expect((int) config('gamevault.fulfillment.stuck_after_minutes') * 60)->toBeGreaterThan($longestRetryGap);
+});
+
 it('uses a non-decreasing, capped exponential backoff for outbox messages', function () {
     $delays = array_map(fn (int $n) => OutboxPublisher::backoffSeconds($n), range(1, 15));
 

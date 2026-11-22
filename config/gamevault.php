@@ -22,7 +22,7 @@ return [
     ],
 
     /*
-    | Timing invariants (asserted by tests/Unit/ConfigInvariantsTest.php):
+    | Timing invariants (asserted by tests/Feature/ConfigInvariantsTest.php):
     |   DeliverGameKey::$timeout (30 s) < lease_seconds (60 s) < queue retry_after (90 s)
     | A live worker therefore never outlives its own lease, and a job redelivered after a worker
     | crash always finds the dead worker's lease already expired and can take over.
@@ -35,8 +35,10 @@ return [
         // Business-level cap on claims per fulfillment cycle (queue retries + recovery re-dispatches).
         // Reaching it fails the order with attempts_exhausted and returns the key to stock.
         'max_attempts' => (int) env('GAMEVAULT_FULFILLMENT_MAX_ATTEMPTS', 10),
-        // Pending orders untouched for this long are re-dispatched by gamevault:recover-stuck
-        // (their queue message was probably lost).
+        // Orders without progress for this long are re-dispatched by gamevault:recover-stuck:
+        // pending orders (their queue message was probably lost) and processing orders whose
+        // lease expired that long ago. Must exceed the longest gap between job retries, or
+        // recovery would start a second retry chain next to a scheduled retry.
         'stuck_after_minutes' => (int) env('GAMEVAULT_STUCK_AFTER_MINUTES', 10),
     ],
 

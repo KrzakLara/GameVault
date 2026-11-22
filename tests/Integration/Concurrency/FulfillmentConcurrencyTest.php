@@ -142,7 +142,10 @@ it('keeps the reservation when a worker is SIGKILLed mid-provisioning, refuses a
     // A redelivered job while the lease is live must not start a second, concurrent provisioning.
     expect(app(FulfillOrder::class)->handle($order->id))->toBe(FulfillmentOutcome::Busy);
 
-    // Once the lease has run out, the recovery sweep takes over and completes exactly once.
+    // No queue message exists for this order (as if it were lost with the worker). Once the lease
+    // has been expired for longer than the stuck threshold, the recovery sweep takes over and
+    // completes exactly once.
+    $this->travel((int) config('gamevault.fulfillment.stuck_after_minutes'))->minutes();
     $this->travel(6)->seconds();
     Artisan::call('gamevault:recover-stuck');
 

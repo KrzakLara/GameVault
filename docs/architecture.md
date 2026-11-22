@@ -113,7 +113,11 @@ The MySQL connection runs **READ COMMITTED** (`DB_ISOLATION_LEVEL`) with `innodb
   dead worker's lease already expired.
 * **Bounded reservation lifetime**: `attempts` counts claims per fulfillment cycle; at
   `max_attempts` (10) the order fails with `attempts_exhausted` and its key returns to stock.
-  `gamevault:recover-stuck` (every 5 min) re-dispatches lost pending orders and expired leases.
+* **Recovery**: `gamevault:recover-stuck` (every 5 min) re-dispatches orders without progress for
+  `stuck_after_minutes` (10): pending orders whose job was lost, and processing orders whose lease
+  expired that long ago. A recently expired lease is usually a relinquished one whose queue retry
+  is still waiting out its backoff; re-dispatching it would start a second retry chain next to the
+  scheduled one, so the threshold is asserted to exceed the longest gap between retries.
 * **Broken ciphertext** fails with `key_integrity` and the key stays quarantined (reserved against
   the failed order), never resold. Admins can cancel such orders; retry is refused.
 
@@ -121,7 +125,7 @@ The MySQL connection runs **READ COMMITTED** (`DB_ISOLATION_LEVEL`) with `innodb
 |---|---|---|
 | Inside checkout transaction | Full rollback, no job, idempotency key not consumed | Client retries the same request |
 | After checkout commit, before the job is queued | Order pending with reserved key | `recover-stuck` after 10 min |
-| After `claim`, during provisioning (SIGKILL tested) | Order processing, key still reserved | Queue redelivery / `recover-stuck` after lease expiry: takeover |
+| After `claim`, during provisioning (SIGKILL tested) | Order processing, key still reserved | Queue redelivery after `retry_after`, or `recover-stuck` 10 min after the lease expired: takeover |
 | Inside `finalize` | Full rollback (key stays reserved, no outbox row) | Retry takes over |
 | After `finalize` commit | Delivered; outbox row committed with it | Publisher (job or scheduled sweep) |
 
