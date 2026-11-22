@@ -325,7 +325,7 @@ Runs of 2026-11-22 on Docker Desktop (Windows 10 host, 8 CPUs and 31 GiB for Doc
 | Lint and format | `npm run lint:check`, `npm run format:check` | clean |
 | Production build | `npm run build` | built |
 | E2E | `scripts/e2e.sh` (Playwright 1.64.1, Chromium) | 21 passed (20 journeys and the link check), 0 failed, 0 flaky, retries disabled |
-| Live Redis/Horizon | `scripts/verify-horizon.sh` | 12 of 14 checks passed; the 2 retry checks failed and exposed the bug below |
+| Live Redis/Horizon | `scripts/verify-horizon.sh` | 14 of 14 checks passed (the run before the fix below: 12 of 14) |
 | Key leak scan | `gamevault:scan-key-leaks` after the E2E and Horizon runs | 124 keys checked in logs, failed jobs, Horizon payloads, audit entries, order events and outbox: none found |
 | Schema | `information_schema` after a fresh migration | 17 CHECK constraints |
 
@@ -333,9 +333,13 @@ Runs of 2026-11-22 on Docker Desktop (Windows 10 host, 8 CPUs and 31 GiB for Doc
 `gamevault:recover-stuck` sweep re-dispatched an order whose queue retry was still waiting out its
 backoff, so the order was attempted 7 times instead of 5 and its retries ran ahead of the backoff
 schedule. Recovery now waits `stuck_after_minutes` after a lease expired before it takes over; a
-regression test that fails without the fix is part of the backend results above. The E2E and live
-Horizon figures come from runs before that fix; they were not repeated to completion afterwards
-before publication. CI runs both on every push (see below).
+regression test that fails without the fix is part of the backend results above. The E2E, live
+Horizon and key-scan figures in the table come from runs on the fixed code: the job was attempted
+exactly 5 times, with gaps of 8.3, 16.6, 46.3 and 136.5 s against the configured 5, 15, 45 and
+135 s (each gap includes the 1.2 s simulated supplier call and the worker pickup), and two recovery
+sweeps forced into the backoff window re-dispatched nothing. A first E2E run after the fix lost one
+journey to a 90-second freeze of the local Docker VM; the rerun passed. CI runs the E2E suite and
+the live checks on every push (see below).
 
 ## CI status
 
