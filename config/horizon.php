@@ -247,6 +247,12 @@ return [
             'fulfillment' => ['maxProcesses' => 3],
             'notifications' => ['maxProcesses' => 1],
         ],
+
+        // Isolated stack for Playwright and live queue checks (docker-compose.yml, profile "e2e").
+        'e2e' => [
+            'fulfillment' => ['maxProcesses' => 2],
+            'notifications' => ['maxProcesses' => 1],
+        ],
     ],
 
     /*

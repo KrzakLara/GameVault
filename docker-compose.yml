@@ -19,10 +19,43 @@ x-app: &app
     redis:
       condition: service_healthy
 
+# Isolated E2E stack (profile "e2e"): its own database (gamevault_e2e), Redis databases 2/3
+# with their own key prefix, and its own log files, so Playwright can never touch dev data.
+# Driven by scripts/e2e.sh; see e2e/README.md.
+x-e2e: &e2e
+  <<: *app
+  profiles: [e2e]
+  environment:
+    APP_ENV: e2e
+    APP_DEBUG: 'false'
+    APP_URL: http://localhost:8000
+    DB_HOST: mysql
+    DB_PORT: 3306
+    DB_DATABASE: gamevault_e2e
+    REDIS_HOST: redis
+    REDIS_PORT: 6379
+    REDIS_DB: 2
+    REDIS_CACHE_DB: 3
+    REDIS_PREFIX: gamevault_e2e_
+    HORIZON_PREFIX: 'gamevault_e2e_horizon:'
+    CACHE_STORE: redis
+    QUEUE_CONNECTION: redis
+    SESSION_DRIVER: database
+    MAIL_MAILER: log
+    LOG_CHANNEL: stack
+    LOG_STACK: single,structured
+    LOG_SINGLE_PATH: /app/storage/logs/e2e/laravel.log
+    LOG_STRUCTURED_PATH: /app/storage/logs/e2e/structured.log
+    CHEAPSHARK_ENABLED: 'true'
+    CHEAPSHARK_BASE_URL: http://cheapshark-stub:8080/api/1.0
+    GAMEVAULT_FULFILLMENT_LATENCY_MS: 1200
+    PHP_CLI_SERVER_WORKERS: 8
+
 services:
   app:
     <<: *app
-    command: php artisan serve --host=0.0.0.0 --port=8000
+    # --no-reload keeps the variables below in the server process (see the e2e-app note).
+    command: php artisan serve --host=0.0.0.0 --port=8000 --no-reload
     environment:
       DB_HOST: mysql
       DB_PORT: 3306
@@ -41,6 +74,63 @@ services:
     <<: *app
     command: php artisan schedule:work
     profiles: [workers]
+
+  e2e-app:
+    <<: *e2e
+    # --no-reload is required: without it `artisan serve` strips the variables above from the
+    # server process, which would then read DB_DATABASE from .env (the dev database).
+    command: php artisan serve --host=0.0.0.0 --port=8000 --no-reload
+    ports:
+      - '127.0.0.1:8001:8000'
+    healthcheck:
+      test: ['CMD-SHELL', 'curl -fsS http://127.0.0.1:8000/up > /dev/null']
+      interval: 2s
+      timeout: 5s
+      retries: 60
+
+  e2e-horizon:
+    <<: *e2e
+    command: php artisan horizon
+
+  e2e-scheduler:
+    <<: *e2e
+    command: php artisan schedule:work
+
+  # Deterministic stand-in for the CheapShark API (e2e/stubs/cheapshark.php). E2E only.
+  cheapshark-stub:
+    image: gamevault-app:dev
+    profiles: [e2e]
+    working_dir: /app
+    volumes:
+      - .:/app
+    command: php -S 0.0.0.0:8080 e2e/stubs/cheapshark.php
+
+  # k6 load tests (loadtest/k6, scripts/loadtest.sh), against the isolated E2E app only.
+  k6:
+    image: grafana/k6:2.3.0
+    profiles: [e2e]
+    network_mode: service:e2e-app
+    working_dir: /scripts
+    volumes:
+      - ./loadtest/k6:/scripts:ro
+      - ./loadtest/results:/results
+    environment:
+      BASE_URL: http://localhost:8000
+
+  # Shares e2e-app's network namespace so the app is reached as http://localhost:8000: a secure
+  # context, which the browser requires for the Clipboard API (journey "copy the key").
+  playwright:
+    image: mcr.microsoft.com/playwright:v1.64.1-noble
+    profiles: [e2e]
+    working_dir: /app
+    volumes:
+      - .:/app
+    environment:
+      E2E_BASE_URL: http://localhost:8000
+      CI: ${CI:-}
+    network_mode: service:e2e-app
+    ipc: host
+    init: true
 
   mysql:
     image: mysql:8.4

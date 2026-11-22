@@ -61,7 +61,7 @@ return [
 
         'single' => [
             'driver' => 'single',
-            'path' => storage_path('logs/laravel.log'),
+            'path' => env('LOG_SINGLE_PATH', storage_path('logs/laravel.log')),
             'level' => env('LOG_LEVEL', 'debug'),
             'replace_placeholders' => true,
         ],
@@ -69,7 +69,7 @@ return [
         // One JSON object per line, including Context data (request_id, order_id, job_id).
         'structured' => [
             'driver' => 'single',
-            'path' => storage_path('logs/structured.log'),
+            'path' => env('LOG_STRUCTURED_PATH', storage_path('logs/structured.log')),
             'level' => env('LOG_LEVEL', 'debug'),
             'formatter' => JsonFormatter::class,
         ],

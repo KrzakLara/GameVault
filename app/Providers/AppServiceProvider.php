@@ -5,6 +5,7 @@ namespace App\Providers;
 use App\Models\User;
 use App\Services\Fulfillment\KeyProvisioner;
 use App\Services\Fulfillment\SimulatedKeyProvisioner;
+use App\Support\E2eGuard;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\Request;
@@ -24,6 +25,11 @@ class AppServiceProvider extends ServiceProvider
 
     public function boot(): void
     {
+        // The Playwright stack must never reach a non-E2E database (see E2eGuard for how it could).
+        if ($this->app->environment('e2e')) {
+            E2eGuard::assertIsolated();
+        }
+
         // Single resources render unwrapped (Inertia props and JSON alike); paginated
         // collections still render as {data, links, meta}.
         JsonResource::withoutWrapping();

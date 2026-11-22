@@ -14,19 +14,20 @@ use Illuminate\Support\Str;
  */
 class GameVaultSeeder extends Seeder
 {
+    /** Fictional catalogue: name, platform, genre, price in cents. Also used by E2eSeeder. */
+    public const TITLES = [
+        ['Starlight Odyssey', 'Steam', 'Adventure', 2999], ['Neon Drift', 'Steam', 'Racing', 1999], ['Rune Keepers', 'Steam', 'RPG', 3499],
+        ['Cyber Arena', 'PlayStation', 'Shooter', 3999], ['Crystal Horizon', 'Xbox', 'Adventure', 2499], ['Shadow Protocol', 'Steam', 'Action', 4599],
+        ['Solar Run', 'Xbox', 'Racing', 1499], ['Arcane Frontier', 'PlayStation', 'RPG', 4499], ['Velocity Zero', 'Steam', 'Racing', 1299],
+        ['Nova Quest', 'Xbox', 'RPG', 2799], ['Echo Valley', 'Steam', 'Indie', 1699], ['Titan Forge', 'PlayStation', 'Strategy', 4999],
+        ['Nightfall City', 'Steam', 'Action', 2199], ['Pixel Raiders', 'Xbox', 'Indie', 999], ['Dream Circuit', 'PlayStation', 'Indie', 2999],
+        ['Stormbound Legends', 'Steam', 'Strategy', 3999], ['Glitch Runner', 'Steam', 'Action', 1199], ['Moonbase 7', 'Xbox', 'Strategy', 2299],
+        ['Hollow Citadel', 'PlayStation', 'Adventure', 3399], ['Parallel Worlds', 'Steam', 'Adventure', 2699],
+    ];
+
     public function run(InventoryAllocator $inventory): void
     {
-        $titles = [
-            ['Starlight Odyssey', 'Steam', 'Adventure', 2999], ['Neon Drift', 'Steam', 'Racing', 1999], ['Rune Keepers', 'Steam', 'RPG', 3499],
-            ['Cyber Arena', 'PlayStation', 'Shooter', 3999], ['Crystal Horizon', 'Xbox', 'Adventure', 2499], ['Shadow Protocol', 'Steam', 'Action', 4599],
-            ['Solar Run', 'Xbox', 'Racing', 1499], ['Arcane Frontier', 'PlayStation', 'RPG', 4499], ['Velocity Zero', 'Steam', 'Racing', 1299],
-            ['Nova Quest', 'Xbox', 'RPG', 2799], ['Echo Valley', 'Steam', 'Indie', 1699], ['Titan Forge', 'PlayStation', 'Strategy', 4999],
-            ['Nightfall City', 'Steam', 'Action', 2199], ['Pixel Raiders', 'Xbox', 'Indie', 999], ['Dream Circuit', 'PlayStation', 'Indie', 2999],
-            ['Stormbound Legends', 'Steam', 'Strategy', 3999], ['Glitch Runner', 'Steam', 'Action', 1199], ['Moonbase 7', 'Xbox', 'Strategy', 2299],
-            ['Hollow Citadel', 'PlayStation', 'Adventure', 3399], ['Parallel Worlds', 'Steam', 'Adventure', 2699],
-        ];
-
-        foreach ($titles as $i => [$name, $platform, $genre, $price]) {
+        foreach (self::TITLES as $i => [$name, $platform, $genre, $price]) {
             $game = Game::firstOrCreate(['slug' => Str::slug($name)], [
                 'name' => $name, 'platform' => $platform, 'genre' => $genre, 'price_cents' => $price, 'currency' => 'EUR',
                 'is_featured' => $i < 4,
