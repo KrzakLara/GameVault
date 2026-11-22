@@ -3,9 +3,10 @@ import { signIn, users } from '../support/app';
 
 const OUT = 'docs/screenshots';
 
+// JPEG keeps the illustrated pages small enough for the README (PNG is several times larger for artwork).
 async function shot(page: Page, name: string, fullPage = false): Promise<void> {
     await page.evaluate(() => document.fonts.ready);
-    await page.screenshot({ path: `${OUT}/${name}.png`, fullPage, animations: 'disabled' });
+    await page.screenshot({ path: `${OUT}/${name}.jpg`, type: 'jpeg', quality: 85, fullPage, animations: 'disabled' });
 }
 
 test('storefront', async ({ page }) => {
@@ -41,6 +42,9 @@ test('mobile storefront', async ({ browser }) => {
 test('purchase, delivery and key reveal', async ({ page }) => {
     await signIn(page, users.buyer);
     await page.goto('/games/twin-strike');
+    await expect(page.getByTestId('buy-button')).toBeEnabled();
+    await expect(page.getByTestId(/^market-/).first()).toBeVisible(); // the deferred market card has resolved
+    await shot(page, 'checkout');
     await page.getByTestId('buy-button').click();
     await expect(page).toHaveURL(/\/my-orders\/[0-9A-Z]{26}$/);
     await expect(page.getByTestId('order-status-delivered')).toBeVisible({ timeout: 30_000 });
