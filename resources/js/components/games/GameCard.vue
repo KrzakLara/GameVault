@@ -12,33 +12,35 @@ defineProps<{ game: Game; lowStockThreshold?: number }>();
 <template>
     <Link
         :href="route('games.show', game.slug)"
-        class="group flex flex-col overflow-hidden rounded-xl border border-border/80 bg-card transition duration-200 hover:-translate-y-0.5 hover:border-primary/50 hover:shadow-[0_18px_50px_-20px_hsl(var(--primary)/0.55)] motion-reduce:hover:translate-y-0"
+        class="group relative flex flex-col overflow-hidden rounded-2xl border border-white/[0.07] bg-card shadow-[0_1px_0_0_hsl(var(--foreground)/0.04)_inset] transition duration-300 hover:-translate-y-1 hover:border-primary/40 hover:shadow-[0_24px_60px_-24px_hsl(var(--primary)/0.6)] focus-visible:-translate-y-1 motion-reduce:transform-none"
         :data-testid="`game-card-${game.slug}`"
     >
-        <div class="relative aspect-[4/5] overflow-hidden">
-            <div class="size-full transition duration-500 group-hover:scale-[1.03] motion-reduce:group-hover:scale-100">
-                <GameCover :slug="game.slug" :name="game.name" :platform="game.platform" :cover-url="game.cover_url" />
+        <div class="relative aspect-[4/5] overflow-hidden bg-raised">
+            <div class="size-full transition duration-500 ease-out group-hover:scale-[1.04] motion-reduce:group-hover:scale-100">
+                <GameCover :slug="game.slug" :name="game.name" :genre="game.genre" :cover-url="game.cover_url" decorative />
             </div>
             <!-- One row that wraps on narrow cards, so the two badges can never overlap. -->
             <div class="absolute inset-x-3 top-3 flex flex-wrap items-start justify-between gap-1.5">
                 <PlatformBadge :platform="game.platform" />
                 <span
                     v-if="game.is_featured"
-                    class="rounded-md bg-primary/90 px-2 py-1 text-[11px] font-semibold uppercase tracking-wide text-primary-foreground"
+                    class="rounded-md bg-primary px-2 py-1 text-[11px] font-semibold uppercase tracking-wide text-primary-foreground shadow-lg shadow-black/30"
                 >
                     Featured
                 </span>
             </div>
         </div>
         <div class="flex flex-1 flex-col gap-3 p-4">
-            <div>
-                <h3 class="line-clamp-1 font-display text-base font-semibold text-foreground group-hover:text-[hsl(258_100%_84%)]">
+            <div class="min-w-0">
+                <p class="text-[11px] font-medium uppercase tracking-[0.14em] text-muted-foreground">{{ game.genre }}</p>
+                <h3
+                    class="mt-1 line-clamp-1 font-display text-base font-semibold text-foreground transition-colors group-hover:text-[hsl(258_100%_86%)]"
+                >
                     {{ game.name }}
                 </h3>
-                <p class="mt-0.5 text-xs text-muted-foreground">{{ game.genre }}</p>
             </div>
-            <div class="mt-auto flex items-center justify-between gap-2">
-                <span class="font-display text-lg font-semibold tabular-nums">{{ formatMoney(game.price_cents, game.currency) }}</span>
+            <div class="mt-auto flex flex-wrap items-center justify-between gap-x-2 gap-y-1.5 border-t border-white/[0.06] pt-3">
+                <span class="font-display text-lg font-bold tabular-nums tracking-tight">{{ formatMoney(game.price_cents, game.currency) }}</span>
                 <StockIndicator v-if="game.stock !== undefined" :stock="game.stock" :low-threshold="lowStockThreshold" />
             </div>
         </div>

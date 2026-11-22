@@ -30,24 +30,36 @@ const { timedOut, restart } = useOrderPolling(order);
                 <ChevronLeft class="size-4" aria-hidden="true" /> My orders
             </Link>
 
-            <header class="mt-6 flex flex-col gap-6 sm:flex-row sm:items-center">
-                <span class="size-24 shrink-0 overflow-hidden rounded-xl border border-white/10">
-                    <GameCover
-                        v-if="order.game"
-                        :slug="order.game.slug"
-                        :name="order.game.name"
-                        :platform="order.game.platform"
-                        :cover-url="order.game.cover_url"
-                    />
-                </span>
-                <div class="min-w-0 flex-1">
-                    <div class="flex flex-wrap items-center gap-3">
-                        <h1 class="text-2xl font-bold sm:text-3xl">{{ order.game?.name }}</h1>
-                        <OrderStatusBadge :status="order.status" />
+            <header class="relative isolate mt-6 overflow-hidden rounded-2xl border border-white/10 shadow-xl shadow-black/30">
+                <div v-if="order.game" class="absolute inset-0 -z-10" aria-hidden="true">
+                    <GameCover :slug="order.game.slug" :name="order.game.name" :genre="order.game.genre" format="landscape" decorative />
+                    <div class="absolute inset-0 bg-gradient-to-r from-background via-background/85 to-background/40" />
+                </div>
+                <div class="flex flex-col gap-5 p-5 sm:flex-row sm:items-center sm:p-6">
+                    <span class="aspect-[4/5] w-20 shrink-0 overflow-hidden rounded-xl border border-white/15 shadow-lg shadow-black/40 sm:w-24">
+                        <GameCover
+                            v-if="order.game"
+                            :slug="order.game.slug"
+                            :name="order.game.name"
+                            :genre="order.game.genre"
+                            :cover-url="order.game.cover_url"
+                            :show-title="false"
+                            decorative
+                        />
+                    </span>
+                    <div class="min-w-0 flex-1">
+                        <p v-if="order.game" class="text-[11px] font-medium uppercase tracking-[0.16em] text-[hsl(258_100%_86%)]">
+                            {{ order.game.genre }} · {{ order.game.platform === 'Steam' ? 'Steam (PC)' : order.game.platform }}
+                        </p>
+                        <div class="mt-1 flex flex-wrap items-center gap-3">
+                            <h1 class="text-2xl font-bold sm:text-3xl">{{ order.game?.name }}</h1>
+                            <OrderStatusBadge :status="order.status" />
+                        </div>
+                        <p class="mt-1.5 text-sm text-[hsl(224_20%_80%)]">
+                            Order <span class="font-mono">{{ order.id }}</span> · {{ formatMoney(order.price_cents, order.currency) }} · simulated
+                            payment
+                        </p>
                     </div>
-                    <p class="mt-1 text-sm text-muted-foreground">
-                        Order <span class="font-mono">{{ order.id }}</span> · {{ formatMoney(order.price_cents, order.currency) }} · simulated payment
-                    </p>
                 </div>
             </header>
 

@@ -28,17 +28,22 @@ defineProps<{ orders: Paginated<Order> }>();
                         class="gv-surface group flex items-center gap-4 p-4 transition hover:border-primary/50"
                         :data-testid="`order-row-${order.id}`"
                     >
-                        <span class="size-16 shrink-0 overflow-hidden rounded-lg">
+                        <span class="aspect-[4/5] w-14 shrink-0 overflow-hidden rounded-lg ring-1 ring-white/10">
                             <GameCover
                                 v-if="order.game"
                                 :slug="order.game.slug"
                                 :name="order.game.name"
-                                :platform="order.game.platform"
+                                :genre="order.game.genre"
                                 :cover-url="order.game.cover_url"
+                                :show-title="false"
+                                decorative
                             />
                         </span>
                         <span class="min-w-0 flex-1">
-                            <span class="block truncate font-semibold">{{ order.game?.name }}</span>
+                            <span class="block truncate font-semibold group-hover:text-[hsl(258_100%_86%)]">{{ order.game?.name }}</span>
+                            <span v-if="order.game" class="block text-xs text-muted-foreground"
+                                >{{ order.game.genre }} · {{ order.game.platform === 'Steam' ? 'Steam (PC)' : order.game.platform }}</span
+                            >
                             <span class="mt-0.5 block text-xs text-muted-foreground"
                                 >{{ formatDateTime(order.created_at) }} · <span class="font-mono">{{ order.id }}</span></span
                             >
