@@ -31,6 +31,7 @@ test('navigation check: no broken internal links on the main pages', async ({ pa
 
         const origin = new URL(page.url()).origin;
         const hrefs = await page.locator('a[href]').evaluateAll((links) => links.map((link) => (link as HTMLAnchorElement).href));
+        const fresh: string[] = [];
         for (const href of hrefs) {
             const url = new URL(href);
             const key = url.pathname + url.search;
@@ -39,10 +40,18 @@ test('navigation check: no broken internal links on the main pages', async ({ pa
                 continue;
             }
             checked.add(key);
-            const result = await page.request.get(url.toString());
-            if (result.status() >= 400) {
-                broken.push(`${result.status()} ${key} (linked from ${path})`);
-            }
+            fresh.push(key);
+        }
+        // Follow the new links a few at a time (the E2E server runs several PHP workers): the same
+        // coverage, without the wall-clock time growing with every link on slower machines.
+        for (let i = 0; i < fresh.length; i += 6) {
+            const batch = fresh.slice(i, i + 6);
+            const results = await Promise.all(batch.map((key) => page.request.get(origin + key)));
+            results.forEach((result, j) => {
+                if (result.status() >= 400) {
+                    broken.push(`${result.status()} ${batch[j]} (linked from ${path})`);
+                }
+            });
         }
     }
 
