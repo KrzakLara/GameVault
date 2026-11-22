@@ -290,7 +290,7 @@ Runs of 2026-11-22 on the same machine, after the artwork and interface changes:
 | --- | --- |
 | Types, lint, format, build | 0 type errors; ESLint and Prettier clean; production build OK |
 | Code style, static analysis | Pint passed; Larastan level 8, no errors |
-| Backend tests | Full suite: 329 passed, 3 failed. Two order queries selected the game's columns without the new `genre` field, and strict mode turned the missing attribute into an error. After selecting it, the 79 tests in the affected files passed; the full suite runs again in CI on the next push. |
+| Backend tests | First full run: 329 passed, 3 failed. Two order queries selected the game's columns without the new `genre` field, and strict mode turned the missing attribute into an error. After selecting it, the 79 tests in the affected files passed, and the full suite on the final 3.1 code passed: 332 passed, 0 failed (1,953 assertions, 316 s), concurrency tests included. |
 | E2E | 20 of 20 journeys passed. The link check hit its 60 s limit while the development stack ran alongside the E2E stack (54 requests at about 1 s each); it now follows links in batches of six and passed in 29 s with the same coverage. |
 | Accessibility and layout | A DOM sweep of 11 pages at 390, 768 and 1440 px found no page-level horizontal overflow, no unnamed links or buttons, no unlabelled form fields, no images or SVG graphics without a text alternative, and exactly one `h1` and one `main` per page, after fixing admin tables that widened the page on phones and adding a `main` landmark to the sign-in pages. An automated axe-core audit was not run. |
 | Screenshots | All recaptured from the running app with `scripts/screenshots.sh` |
