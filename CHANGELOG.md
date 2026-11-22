@@ -5,7 +5,9 @@ and versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
-Prepared as **1.0.0**, the first stable portfolio release. Not tagged yet.
+## [1.0.0] - 2026-11-22
+
+The first stable portfolio release.
 
 ### Product
 
@@ -69,3 +71,6 @@ Prepared as **1.0.0**, the first stable portfolio release. Not tagged yet.
 - Delivery e-mails are at-least-once: a duplicate is possible after a publisher crash.
 - `APP_KEY` rotation requires re-encrypting keys and recomputing fingerprints.
 - No load-test figures are published yet, and there is no public deployment.
+
+[Unreleased]: https://github.com/KrzakLara/GameVault/compare/v1.0.0...HEAD
+[1.0.0]: https://github.com/KrzakLara/GameVault/releases/tag/v1.0.0
