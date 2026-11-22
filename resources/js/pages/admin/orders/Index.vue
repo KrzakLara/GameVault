@@ -66,7 +66,7 @@ const selectClass = 'h-10 rounded-lg border border-input bg-card px-3 text-sm [&
                 v-model="form.q"
                 type="search"
                 placeholder="Order id or customer e-mail…"
-                class="h-10 flex-1 rounded-lg border border-input bg-background px-3 text-sm placeholder:text-muted-foreground"
+                class="h-10 w-full rounded-lg border border-input bg-background px-3 text-sm placeholder:text-muted-foreground sm:flex-1"
                 data-testid="admin-order-search"
                 @input="applySearch"
             />
@@ -83,7 +83,7 @@ const selectClass = 'h-10 rounded-lg border border-input bg-card px-3 text-sm [&
         </form>
 
         <div class="gv-surface overflow-hidden" :aria-busy="loading">
-            <div class="overflow-x-auto">
+            <div class="relative overflow-x-auto">
                 <table class="w-full min-w-[720px] text-left text-sm" data-testid="admin-orders-table">
                     <thead class="border-b border-border/80 bg-muted/40 text-xs uppercase tracking-wide text-muted-foreground">
                         <tr>

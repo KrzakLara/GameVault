@@ -85,7 +85,7 @@ async function submitImport() {
                 v-model="form.search"
                 type="search"
                 placeholder="Search games…"
-                class="h-10 flex-1 rounded-lg border border-input bg-background px-3 text-sm placeholder:text-muted-foreground"
+                class="h-10 w-full rounded-lg border border-input bg-background px-3 text-sm placeholder:text-muted-foreground sm:flex-1"
                 @input="applySearch"
             />
             <label for="inv-stock" class="sr-only">Stock level</label>
@@ -102,7 +102,7 @@ async function submitImport() {
         </form>
 
         <div class="gv-surface overflow-hidden">
-            <div class="overflow-x-auto">
+            <div class="relative overflow-x-auto">
                 <table class="w-full min-w-[640px] text-left text-sm" data-testid="inventory-table">
                     <thead class="border-b border-border/80 bg-muted/40 text-xs uppercase tracking-wide text-muted-foreground">
                         <tr>

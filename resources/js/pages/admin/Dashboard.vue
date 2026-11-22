@@ -64,6 +64,26 @@ defineProps<{
                         <dd class="mt-1 font-display text-xl font-semibold">{{ inventory.sold }}</dd>
                     </div>
                 </dl>
+                <!-- Share of all keys per state, from the same three counts (decorative: the numbers above say it). -->
+                <div
+                    v-if="inventory.available + inventory.reserved + inventory.sold > 0"
+                    class="mt-4 flex h-2 overflow-hidden rounded-full bg-muted"
+                    aria-hidden="true"
+                    data-testid="stock-composition"
+                >
+                    <span
+                        class="bg-success"
+                        :style="{ width: `${(100 * inventory.available) / (inventory.available + inventory.reserved + inventory.sold)}%` }"
+                    />
+                    <span
+                        class="bg-highlight"
+                        :style="{ width: `${(100 * inventory.reserved) / (inventory.available + inventory.reserved + inventory.sold)}%` }"
+                    />
+                    <span
+                        class="bg-foreground/50"
+                        :style="{ width: `${(100 * inventory.sold) / (inventory.available + inventory.reserved + inventory.sold)}%` }"
+                    />
+                </div>
                 <h3 class="mt-6 flex items-center gap-2 text-sm font-medium">
                     <AlertTriangle class="size-4 text-warning" aria-hidden="true" /> Low stock (fewer than {{ lowStock.threshold }})
                 </h3>

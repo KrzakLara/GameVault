@@ -8,7 +8,7 @@ defineProps<{ title?: string; description?: string }>();
 
 <template>
     <div class="gv-aurora flex min-h-svh flex-col items-center justify-center px-4 py-10">
-        <div class="w-full max-w-sm">
+        <main class="w-full max-w-sm">
             <div class="mb-8 flex flex-col items-center gap-6 text-center">
                 <Link :href="route('home')" class="rounded-lg" aria-label="GameVault home">
                     <GvLogo size="md" />
@@ -22,7 +22,7 @@ defineProps<{ title?: string; description?: string }>();
                 <slot />
             </div>
             <p class="mt-6 text-center text-xs text-muted-foreground">Portfolio demo · fictional games · simulated checkout</p>
-        </div>
+        </main>
         <Toaster />
     </div>
 </template>

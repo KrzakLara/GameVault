@@ -96,7 +96,7 @@ function requeueAll() {
         </p>
 
         <div class="gv-surface overflow-hidden">
-            <div class="overflow-x-auto">
+            <div class="relative overflow-x-auto">
                 <table class="w-full min-w-[820px] text-left text-sm" data-testid="outbox-table">
                     <thead class="border-b border-border/80 bg-muted/40 text-xs uppercase tracking-wide text-muted-foreground">
                         <tr>
