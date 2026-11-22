@@ -1,11 +1,14 @@
 {
     "$schema": "https://getcomposer.org/schema.json",
-    "name": "laravel/vue-starter-kit",
+    "name": "larakrzak/gamevault",
     "type": "project",
-    "description": "The skeleton application for the Laravel framework.",
+    "description": "Production-oriented digital gaming marketplace built with Laravel and Vue, featuring concurrency-safe checkout and reliable asynchronous fulfillment.",
     "keywords": [
         "laravel",
-        "framework"
+        "vue",
+        "inertia",
+        "mysql",
+        "marketplace"
     ],
     "license": "MIT",
     "require": {

@@ -31,7 +31,7 @@ verified with real MySQL processes, Playwright journeys and live Horizon checks
 [Highlights](#engineering-highlights) · [Screenshots](#screenshots) · [Stack](#technology-stack) ·
 [Features](#features) · [Quick start](#quick-start) · [Architecture](#architecture-overview) ·
 [Testing](#testing) · [Results](#verified-results) · [CI](#ci-status) · [Public demo](#public-demo) ·
-[AI](#how-i-used-ai) · [Docs](#documentation)
+[AI](#how-i-used-ai) · [Docs](#documentation) · [License](#license)
 
 ## Engineering highlights
 
@@ -368,3 +368,9 @@ What keeps that honest:
 - [Public demo: feasibility, plan and security](docs/deployment.md)
 - [End-to-end tests](e2e/README.md)
 - [Changelog](CHANGELOG.md)
+
+## License
+
+GameVault is released under the [MIT License](LICENSE). It started from the Laravel Vue starter
+kit (MIT), and the shadcn-vue UI primitives in `resources/js/components/ui` are Copyright (c) 2023
+unovue, also under the MIT License. Composer and npm dependencies keep their own licenses.

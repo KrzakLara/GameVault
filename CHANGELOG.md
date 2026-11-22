@@ -50,6 +50,10 @@ Prepared as **1.0.0**, the first stable portfolio release. Not tagged yet.
   Redis/Horizon checks, a plaintext key-leak scan and k6 load-test scenarios.
 - GitHub Actions: backend, frontend and E2E jobs on every push.
 
+### License
+
+- MIT License (`LICENSE`); the Composer package is `larakrzak/gamevault`.
+
 ### Fixed
 
 - Stuck-order recovery no longer starts a second retry chain while a fulfillment job waits out its
