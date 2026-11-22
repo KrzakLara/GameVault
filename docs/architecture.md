@@ -190,7 +190,8 @@ All tests run in Docker against MySQL 8.4 (`gamevault_test`; the suite refuses a
 
 ## Known limitations
 
-* Payment is simulated; there is no real supplier API (`SimulatedKeyProvisioner` only waits).
+* Payment is simulated; there is no real supplier API (`SimulatedKeyProvisioner` waits, and in
+  non-production environments can simulate an outage: `php artisan gamevault:supplier-outage on`).
 * The delivery e-mail is at-least-once (see above).
 * APP_KEY rotation requires re-encrypting keys and recomputing fingerprints (keyed with APP_KEY).
 * Leases use the application clock; multi-host deployments need NTP-synchronised clocks (the
