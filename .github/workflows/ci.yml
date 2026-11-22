@@ -3,12 +3,22 @@ on:
   push:
   pull_request:
 
-# Single gate for the backend: style, static analysis, and the full test suite on real MySQL 8.4,
-# including the multi-process concurrency tests (they spawn independent PHP processes, each with
-# its own MySQL connection). The suite refuses to run without MySQL by design.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+# Every step is a check: nothing here rewrites code (fixers such as `pint` or `prettier --write`
+# would always "pass"). The three jobs run in parallel.
 jobs:
-  tests:
+  # Style, static analysis and the full Pest suite on real MySQL 8.4, including the multi-process
+  # concurrency tests (independent PHP processes, each with its own MySQL connection). The suite
+  # refuses to run against anything but the gamevault_test database (phpunit.xml, TestCase).
+  backend:
     runs-on: ubuntu-latest
+    timeout-minutes: 25
     services:
       mysql:
         image: mysql:8.4
@@ -34,10 +44,16 @@ jobs:
           # pcntl/posix: the concurrency tests SIGKILL worker processes on purpose.
           extensions: mbstring, dom, fileinfo, pdo_mysql, pcntl, posix, intl, bcmath
           coverage: none
+          tools: composer:v2
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
           cache: npm
+      - name: Composer cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.composer/cache/files
+          key: composer-${{ hashFiles('composer.lock') }}
       - run: composer validate --strict
       - run: composer install --no-interaction --prefer-dist --no-progress
       - run: cp .env.example .env && php artisan key:generate
@@ -46,3 +62,69 @@ jobs:
       # The Vite manifest must exist before tests render full pages.
       - run: npm ci && npm run build
       - run: php artisan test
+
+  # TypeScript (strict, including the Playwright suite), ESLint, Prettier and the production build.
+  frontend:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+      # Ziggy's TypeScript types are imported from vendor/, so Composer packages are needed too.
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.4'
+          coverage: none
+          tools: composer:v2
+      - run: composer install --no-interaction --prefer-dist --no-progress --no-scripts
+      - run: npm run typecheck
+      - run: npm run lint:check
+      - run: npm run format:check
+      - run: npm run build
+
+  # The real stack in Docker, exactly as run locally: Playwright journeys against the isolated E2E
+  # environment (gamevault_e2e database, Redis databases 2/3), then live Redis/Horizon checks.
+  e2e:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - name: Build the app image (cached)
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: docker/php/Dockerfile
+          tags: gamevault-app:dev
+          load: true
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+      - name: Install dependencies in the container
+        run: |
+          cp .env.example .env
+          docker compose run --rm --no-deps -T app composer install --no-interaction --prefer-dist --no-progress
+          docker compose run --rm --no-deps -T app php artisan key:generate
+          docker compose run --rm --no-deps -T app npm ci
+      - name: Playwright journeys
+        run: scripts/e2e.sh
+        env:
+          E2E_KEEP_RUNNING: '1'
+      - name: Live Redis/Horizon verification
+        run: scripts/verify-horizon.sh
+      - name: Upload reports and logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-${{ github.run_id }}
+          path: |
+            playwright-report/
+            test-results/
+            storage/logs/e2e/
+          retention-days: 14
+      - name: Stop the stack
+        if: always()
+        run: docker compose --profile e2e down --volumes
