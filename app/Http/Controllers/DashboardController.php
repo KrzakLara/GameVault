@@ -23,7 +23,7 @@ class DashboardController extends Controller
                 'unsuccessful' => ($counts['failed'] ?? 0) + ($counts['cancelled'] ?? 0),
             ],
             'recentOrders' => OrderResource::collection(
-                $user->orders()->with('game:id,name,slug,platform,cover_url')->latest('id')->limit(5)->get()
+                $user->orders()->with('game:id,name,slug,platform,genre,cover_url')->latest('id')->limit(5)->get()
             )->resolve(),
         ]);
     }

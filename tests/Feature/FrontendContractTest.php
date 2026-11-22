@@ -37,7 +37,7 @@ it('matches the Order type and exposes no secrets', function () {
     $resource = OrderResource::make($order)->resolve(new Request);
 
     expect(keysOf($resource))->toBe(['can_reveal', 'created_at', 'currency', 'delivered_at', 'failure_message', 'game', 'id', 'price_cents', 'status', 'timeline'])
-        ->and(keysOf($resource['game']))->toBe(['cover_url', 'name', 'platform', 'slug'])
+        ->and(keysOf($resource['game']))->toBe(['cover_url', 'genre', 'name', 'platform', 'slug'])
         ->and(json_encode($resource))->not->toContain('CONTRACT-SECRET-1')->not->toContain($order->idempotency_key);
 });
 

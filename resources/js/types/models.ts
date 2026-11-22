@@ -67,7 +67,7 @@ export interface Order {
     status: OrderStatus;
     price_cents: number;
     currency: string;
-    game?: { name: string; slug: string; platform: Platform; cover_url: string | null };
+    game?: { name: string; slug: string; platform: Platform; genre: string; cover_url: string | null };
     failure_message: string | null;
     can_reveal: boolean;
     created_at: string;

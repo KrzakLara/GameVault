@@ -24,7 +24,7 @@ class OrderController extends Controller
     public function index(Request $request): Response
     {
         $orders = $this->currentUser($request)->orders()
-            ->with('game:id,name,slug,platform,cover_url')
+            ->with('game:id,name,slug,platform,genre,cover_url')
             ->latest('id')
             ->paginate(10);
 

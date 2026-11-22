@@ -31,6 +31,7 @@ class OrderResource extends JsonResource
                 'name' => $this->game->name,
                 'slug' => $this->game->slug,
                 'platform' => $this->game->platform,
+                'genre' => $this->game->genre,
                 'cover_url' => $this->game->cover_url,
             ]),
             'failure_message' => $this->status === OrderStatus::Failed ? $this->failure_code?->message() : null,
